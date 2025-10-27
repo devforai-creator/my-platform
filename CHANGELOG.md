@@ -130,6 +130,9 @@ Phase 0 MVP 완성! BYOK 기반 캐릭터 채팅 플랫폼의 핵심 기능이 �
 - `useChat` hook 통합
 
 ### Known Issues
+- **FIFO 컨텍스트 윈도우 미구현**: 현재 모든 메시지를 LLM에 전송 (v0.2.0에서 개선 예정)
+  - 대화가 길어질수록 토큰 비용 증가 및 속도 저하
+  - 모델 context size 초과 시 API 에러 발생 가능
 - Supabase Realtime.js Edge Runtime 경고 (기능에는 영향 없음)
 - NSFW 콘텐츠 Google Gemini 검열 (provider 특성)
 
