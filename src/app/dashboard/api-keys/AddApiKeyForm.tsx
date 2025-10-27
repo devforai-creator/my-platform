@@ -11,20 +11,19 @@ const PROVIDERS = [
 
 const MODELS = {
   google: [
-    'gemini-2.0-flash-exp',
-    'gemini-1.5-pro',
-    'gemini-1.5-flash',
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
   ],
   openai: [
-    'gpt-4o',
-    'gpt-4o-mini',
-    'gpt-4-turbo',
-    'gpt-3.5-turbo',
+    'gpt-5',
+    'gpt-4.1',
+    'gpt-4.1-nano',
   ],
   anthropic: [
-    'claude-3-5-sonnet-20241022',
-    'claude-3-5-haiku-20241022',
-    'claude-3-opus-20240229',
+    'claude-sonnet-4-5',
+    'claude-haiku-4-5',
+    'claude-opus-4-1',
   ],
 }
 
