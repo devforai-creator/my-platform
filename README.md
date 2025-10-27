@@ -1,6 +1,9 @@
 # CharacterChat Platform
 
-**Phase 0 MVP** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
+**Phase 0 MVP (v0.1.0)** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
+
+[![Deploy Status](https://img.shields.io/badge/deploy-success-brightgreen)](https://mycharacterchatplatform-a4waju02p-sydebs-projects.vercel.app)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 프로젝트 개요
 
@@ -9,23 +12,82 @@
 ### 핵심 차별점
 
 1. **압도적 비용 효율**: Google 무료 티어를 안전하게 활용하여 월 0원으로 프런티어 모델 사용
-2. **편의성**: RisuAI의 복잡한 설정을 체계화된 공식 가이드로 해결
+2. **편의성**: 복잡한 설정을 체계화된 UI로 간소화
 3. **보안**: Supabase Vault를 활용한 API 키 암호화 저장
 4. **확장성**: Phase 1 자체 모델 도입을 위한 아키텍처
+5. **멀티 디바이스**: PC와 모바일 모두 반응형으로 지원
+
+## 주요 기능 (Phase 0 완료)
+
+✅ **인증 시스템**
+- 회원가입/로그인 (Supabase Auth)
+- 보호된 라우트 관리
+
+✅ **API 키 관리 (BYOK)**
+- Google Gemini, OpenAI, Anthropic 지원
+- Supabase Vault 암호화 저장
+- 모델별 선호도 설정
+
+✅ **캐릭터 관리**
+- 1:1 캐릭터 대화 템플릿
+- 멀티 캐릭터 시뮬레이션 템플릿
+- 자유로운 시스템 프롬프트 작성
+
+✅ **실시간 채팅**
+- 스트리밍 응답 (AI SDK)
+- 자동 메시지 저장
+- 토큰 사용량 추적
+- 자동 스크롤
 
 ## 기술 스택
 
-- **Frontend/Backend**: Next.js 15 (App Router) + TypeScript
-- **Database**: Supabase (PostgreSQL + Auth + Vault)
-- **Styling**: Tailwind CSS
-- **Deployment**: Vercel (예정)
+### Frontend/Backend
+- **Framework**: Next.js 15.5.6 (App Router)
+- **Language**: TypeScript 5
+- **Styling**: Tailwind CSS 3.4
+- **UI**: React 19
+
+### Database & Auth
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth
+- **Secret Management**: Supabase Vault
+
+### AI & LLM
+- **SDK**: Vercel AI SDK v3.4.33
+- **Providers**:
+  - @ai-sdk/google v0.0.55 (Gemini 2.5)
+  - @ai-sdk/openai v0.0.72 (GPT-5, GPT-4.1)
+  - @ai-sdk/anthropic v0.0.56 (Claude Sonnet 4.5, Haiku 4.5, Opus 4.1)
+
+### Deployment
+- **Platform**: Vercel
+- **Runtime**: Edge Runtime (60s timeout)
+- **CI/CD**: GitHub Integration
+
+## 지원 모델 (2025년 10월 기준)
+
+### Google Gemini
+- gemini-2.5-pro (최고 성능)
+- gemini-2.5-flash (균형)
+- gemini-2.5-flash-lite (경량)
+
+### OpenAI GPT
+- gpt-5 (최신)
+- gpt-4.1 (안정)
+- gpt-4.1-nano (경량)
+
+### Anthropic Claude
+- claude-sonnet-4-5 (최고 코딩)
+- claude-haiku-4-5 (코스트 효율)
+- claude-opus-4-1 (최고 성능)
 
 ## 시작하기
 
-### 1. 레포지토리 클론 (또는 현재 프로젝트 사용)
+### 1. 레포지토리 클론
 
 ```bash
-cd my_characterchat_platform
+git clone git@github.com:devforai-creator/my-platform.git
+cd my-platform
 ```
 
 ### 2. 의존성 설치
@@ -40,15 +102,17 @@ npm install
 
 **간단 요약**:
 1. [Supabase](https://supabase.com)에서 프로젝트 생성
-2. `supabase/migrations/00_initial_schema.sql` 실행
-3. API Keys 복사하여 `.env.local` 생성
+2. SQL Editor에서 다음 파일들을 순서대로 실행:
+   - `supabase/migrations/00_initial_schema.sql`
+   - `supabase/migrations/01_vault_helpers.sql`
+3. Settings → API에서 API Keys 확인
 
 ### 4. 환경 변수 설정
 
 `.env.local` 파일 생성:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
@@ -61,49 +125,47 @@ npm run dev
 
 브라우저에서 [http://localhost:3000](http://localhost:3000) 접속
 
+### 6. 프로덕션 빌드
+
+```bash
+npm run build
+npm start
+```
+
 ## 프로젝트 구조
 
 ```
 my_characterchat_platform/
 ├── src/
-│   ├── app/                    # Next.js App Router
+│   ├── app/                      # Next.js App Router
 │   │   ├── layout.tsx
 │   │   ├── page.tsx
-│   │   ├── auth/               # 인증 페이지 (예정)
-│   │   ├── dashboard/          # 대시보드 (예정)
-│   │   └── api/                # API Routes
-│   ├── components/             # React 컴포넌트 (예정)
+│   │   ├── auth/                 # 인증 (로그인/회원가입)
+│   │   │   ├── login/
+│   │   │   ├── signup/
+│   │   │   └── actions.ts
+│   │   ├── dashboard/            # 대시보드
+│   │   │   ├── page.tsx
+│   │   │   ├── api-keys/         # API 키 관리
+│   │   │   ├── characters/       # 캐릭터 관리
+│   │   │   └── chats/            # 채팅
+│   │   └── api/
+│   │       └── chat/             # 채팅 API (Edge Runtime)
 │   ├── lib/
-│   │   └── supabase/           # Supabase 클라이언트
-│   │       ├── client.ts       # 브라우저용
-│   │       └── server.ts       # 서버용
+│   │   └── supabase/             # Supabase 클라이언트
+│   │       ├── client.ts         # 브라우저용
+│   │       └── server.ts         # 서버용
 │   ├── types/
-│   │   └── database.types.ts   # DB 타입 정의
-│   └── middleware.ts           # 인증 미들웨어
+│   │   └── database.types.ts     # DB 타입 정의
+│   └── middleware.ts             # 인증 미들웨어
 ├── supabase/
 │   └── migrations/
-│       └── 00_initial_schema.sql
-├── SUPABASE_SETUP.md           # Supabase 설정 가이드
-└── 플랫폼 사업v1.0.2.md        # 사업 계획서
+│       ├── 00_initial_schema.sql # 초기 스키마
+│       └── 01_vault_helpers.sql  # Vault RPC 함수
+├── SUPABASE_SETUP.md
+├── CHANGELOG.md
+└── 플랫폼 사업v1.0.2.md
 ```
-
-## Phase 0 MVP 기능
-
-### ✅ 완료
-- [x] 프로젝트 초기 구조
-- [x] Supabase 스키마 설계
-- [x] 타입 정의
-
-### 🚧 진행 중
-- [ ] 인증 시스템 (회원가입/로그인)
-- [ ] API 키 관리 (BYOK)
-- [ ] 캐릭터 관리
-- [ ] 채팅 기능 (스트리밍)
-
-### 📋 예정
-- [ ] 온보딩 튜토리얼
-- [ ] Google 무료 티어 가이드
-- [ ] 캐릭터 템플릿
 
 ## 데이터베이스 스키마
 
@@ -111,29 +173,52 @@ my_characterchat_platform/
 
 - **profiles**: 사용자 확장 정보
 - **api_keys**: 암호화된 API 키 저장 (Vault 사용)
-- **characters**: 캐릭터 정의
+- **characters**: 캐릭터 정의 (1:1 & 시뮬레이션)
 - **chats**: 채팅 세션
-- **messages**: 메시지 (토큰 추적 포함)
+- **messages**: 메시지 (토큰 사용량 추적)
 
-상세 스키마는 `supabase/migrations/00_initial_schema.sql` 참조
+### 보안 기능
 
-## 보안
+- **Row Level Security (RLS)**: 모든 테이블에 적용
+- **Supabase Vault**: API 키 암호화 저장
+- **Edge Runtime Proxy**: 클라이언트에 API 키 노출 방지
 
-### API 키 보호
-- Supabase Vault를 통한 암호화 저장
-- Row Level Security (RLS)로 사용자 격리
-- 서버 사이드 프록시로 클라이언트 노출 방지
+상세 스키마는 `supabase/migrations/` 참조
 
-### 인증
-- Supabase Auth 사용
-- 미들웨어를 통한 보호된 라우트 관리
+## 배포
+
+### Vercel 배포 (추천)
+
+1. Vercel 계정 연동:
+```bash
+vercel login
+```
+
+2. 프로젝트 배포:
+```bash
+vercel --prod
+```
+
+3. 환경 변수 설정 (Vercel Dashboard):
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+
+### GitHub 연동 자동 배포
+
+GitHub에 push하면 자동으로 Vercel에 배포됩니다.
+
+## 사용 방법
+
+1. **회원가입**: 이메일과 비밀번호로 계정 생성
+2. **API 키 등록**: Google, OpenAI, Anthropic 중 선택하여 API 키 등록
+   - [Google AI Studio](https://aistudio.google.com/app/apikey)
+   - [OpenAI Platform](https://platform.openai.com/api-keys)
+   - [Anthropic Console](https://console.anthropic.com/settings/keys)
+3. **캐릭터 생성**: 템플릿 선택 또는 직접 시스템 프롬프트 작성
+4. **채팅 시작**: 캐릭터와 API 키를 선택하여 대화 시작
 
 ## 개발 가이드
-
-### 브랜치 전략
-- `main`: 프로덕션 배포용
-- `develop`: 개발 브랜치
-- `feature/*`: 기능 개발
 
 ### 커밋 컨벤션
 - `feat`: 새 기능
@@ -144,10 +229,51 @@ my_characterchat_platform/
 - `test`: 테스트
 - `chore`: 빌드/설정
 
+### 코드 스타일
+- TypeScript strict mode
+- ESLint + Next.js 규칙
+- Prettier (권장)
+
+## 보안
+
+### API 키 보호
+- ✅ Supabase Vault 암호화 저장
+- ✅ Row Level Security로 사용자 격리
+- ✅ Edge Runtime 프록시로 클라이언트 노출 방지
+- ✅ HTTPS 통신
+
+### 인증
+- ✅ Supabase Auth
+- ✅ 미들웨어 기반 보호 라우트
+- ✅ JWT 토큰 검증
+
+## 향후 계획
+
+### Phase 1: 자체 모델 도입
+- 비용 최적화 모델 학습
+- 하이브리드 라우팅 (BYOK + 자체 모델)
+
+### Phase 2: 커뮤니티 기능
+- 캐릭터 공유 마켓
+- 평점/리뷰 시스템
+
+### Phase 3: 고급 기능
+- RAG (문서 기반 대화)
+- 음성 채팅
+- 이미지 생성
+
 ## 라이센스
 
 MIT License
 
+## 기여
+
+이슈와 PR을 환영합니다!
+
 ## 문의
 
-프로젝트 관련 문의는 이슈로 등록해주세요.
+프로젝트 관련 문의는 GitHub Issues로 등록해주세요.
+
+---
+
+**Made with ❤️ using Next.js, Supabase, and AI SDK**
