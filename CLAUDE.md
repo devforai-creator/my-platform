@@ -2,9 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## AI Agents in This Project
+
+This project utilizes two AI agents for development:
+
+- **Claude Code** (claude.ai/code): Primary development assistant for code generation, architecture guidance, and general development tasks. You are currently reading this file.
+- **Codex**: Specialized agent for security reviews, code quality analysis, and automated fixes. Used for critical security patches and lint/type checking.
+
+When reviewing code or making changes, be aware that both agents may have contributed to different parts of the codebase.
+
 ## Project Overview
 
-CharacterChat Platform - A BYOK (Bring Your Own Key) character chat platform built with Next.js 15, Supabase, and Vercel AI SDK. Users register their own API keys (Google, OpenAI, Anthropic) to chat with custom AI characters. Currently at Phase 0 MVP (v0.1.0).
+CharacterChat Platform - A BYOK (Bring Your Own Key) character chat platform built with Next.js 15, Supabase, and Vercel AI SDK. Users register their own API keys (Google, OpenAI, Anthropic) to chat with custom AI characters. Currently at Phase 0 (v0.1.2).
 
 ## Development Commands
 
@@ -37,12 +46,13 @@ npx tsc --noEmit     # Type check without building
 
 ### API Key Security Architecture
 
-**Critical Security Pattern**:
+**Critical Security Pattern** (v0.1.2+):
 1. User's raw API keys are NEVER stored in database tables
 2. Keys are encrypted in Supabase Vault with unique secret names
 3. `api_keys` table only stores `vault_secret_name` reference
-4. Edge Runtime API route (`/api/chat/route.ts`) decrypts keys server-side using `get_decrypted_secret` RPC
-5. Client never receives actual API keys
+4. **Client never sees `vault_secret_name`** - server looks it up by API key ID
+5. Edge Runtime API route (`/api/chat/route.ts`) decrypts keys server-side using `get_decrypted_secret` RPC
+6. **Vault RPCs verify `auth.uid()` ownership** before decrypt/delete
 
 **Storing API Keys**:
 ```typescript
@@ -71,17 +81,17 @@ const { data: secretData } = await supabase.rpc('get_decrypted_secret', {
 
 ### Chat Flow Architecture
 
-**Message Flow**:
+**Message Flow** (v0.1.2+):
 1. User types message in `ChatInterface.tsx` (Client Component)
 2. Client calls `/api/chat` Edge Runtime route with:
    - `messages[]`: Chat history
    - `chatId`: Current chat session
-   - `characterId`: Character to use
-   - `provider`: 'google' | 'openai' | 'anthropic'
    - `apiKeyId`: Which API key to use
 3. Edge Runtime:
+   - **Validates request input** (400 if malformed)
    - Verifies user authentication
-   - Fetches and decrypts API key from Vault
+   - **Loads chat and uses its `character_id`** (not client-provided)
+   - Fetches and decrypts API key from Vault (with ownership check)
    - Loads character's system prompt
    - Creates provider-specific model (Google/OpenAI/Anthropic)
    - Streams response using Vercel AI SDK's `streamText()`
@@ -237,7 +247,8 @@ export default function MyComponent() {
 
 **Vault RPC Functions** (defined in `01_vault_helpers.sql`):
 - `store_encrypted_secret(secret_name, secret_value)` - Store API key
-- `get_decrypted_secret(secret_name)` - Retrieve API key (server-only!)
+- `get_decrypted_secret(secret_name)` - Retrieve API key (**v0.1.2+: verifies `auth.uid()` ownership**)
+- `delete_secret(secret_name)` - Delete secret (**v0.1.2+: verifies ownership**)
 
 ## Recent Updates
 

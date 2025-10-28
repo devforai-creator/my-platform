@@ -5,14 +5,14 @@ Keep route-specific logic beside its segment.
 - `src/app`: Route segments (`dashboard`, `auth`, `api`) with page components, server actions, and Supabase calls.
 - `src/lib`: Shared utilities, especially `supabase/server` factories and auth helpers.
 - `src/types`: Workspace-wide TypeScript interfaces.
-- `supabase/migrations`: Versioned SQL; keep in sync with Supabase dashboard before merging schema changes.
+- `supabase/migrations`: Versioned SQL; prefer new migration files (avoid retroactive edits once deployed) and keep schemas aligned with the Supabase dashboard.
 
 ## Build, Test, and Development Commands
 Stick to npm scripts for parity with CI.
 - `npm run dev`: Starts the Next.js dev server at `http://localhost:3000`.
 - `npm run build`: Compiles the production bundle; catch type/config regressions before release.
 - `npm run start`: Serves the built app for production smoke tests.
-- `npm run lint`: Runs ESLint with the Next config; auto-fix using `next lint --fix`.
+- `CI=1 npm run lint`: Runs ESLint in non-interactive mode (avoids the Next.js prompt); auto-fix via `next lint --fix` when handy.
 
 ## Coding Style & Naming Conventions
 TypeScript + Tailwind dominate; mirror the patterns in `src/app/dashboard`.
@@ -37,3 +37,9 @@ Commits follow concise Conventional Commit prefixes (`feat:`, `docs:`, `chore:`)
 Copy `.env.example` to `.env.local` and supply Supabase plus AI provider keys.
 - Keep secrets out of git; update `.env.example` with sanitized placeholders instead.
 - For database provisioning, follow `SUPABASE_SETUP.md` and document new tables there.
+
+## Agent Coordination
+Two AI agents contribute here: Codex (CLI-based; primary for code edits) and Claude (parallel terminal; often analyzing architectural trade-offs).  
+- Announce ownership of ongoing tasks in the shared channel to avoid duplicate patches.  
+- Codex should prioritize implementation details and lint fixes; Claude can focus on reviews, high-level strategy, or documentation when Codex is mid-change.  
+- When both touch the same feature, pin the source of truth (`main` branch or a shared PR) before handing off to prevent drift.
