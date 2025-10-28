@@ -48,6 +48,19 @@ export default async function ChatPage({ params, searchParams }: Props) {
     .eq('chat_id', id)
     .order('created_at', { ascending: true })
 
+  // 토큰 사용량 계산
+  const totalTokens = messages?.reduce((sum, msg) => {
+    return sum + (msg.prompt_tokens || 0) + (msg.completion_tokens || 0)
+  }, 0) || 0
+
+  const totalPromptTokens = messages?.reduce((sum, msg) => {
+    return sum + (msg.prompt_tokens || 0)
+  }, 0) || 0
+
+  const totalCompletionTokens = messages?.reduce((sum, msg) => {
+    return sum + (msg.completion_tokens || 0)
+  }, 0) || 0
+
   // API 키 목록 가져오기
   const { data: apiKeys } = await supabase
     .from('api_keys')
@@ -90,6 +103,11 @@ export default async function ChatPage({ params, searchParams }: Props) {
         initialMessages={messages || []}
         apiKeys={apiKeys || []}
         preselectedApiKeyId={preselectedApiKeyId}
+        initialTokenStats={{
+          total: totalTokens,
+          prompt: totalPromptTokens,
+          completion: totalCompletionTokens,
+        }}
       />
     </div>
   )

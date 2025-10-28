@@ -4,12 +4,19 @@ import { useChat } from 'ai/react'
 import { useEffect, useRef, useState } from 'react'
 import type { Message, ApiKey } from '@/types/database.types'
 
+interface TokenStats {
+  total: number
+  prompt: number
+  completion: number
+}
+
 interface Props {
   chatId: string
   characterId: string
   initialMessages: Message[]
   apiKeys: ApiKey[]
   preselectedApiKeyId?: string
+  initialTokenStats: TokenStats
 }
 
 export default function ChatInterface({
@@ -18,6 +25,7 @@ export default function ChatInterface({
   initialMessages,
   apiKeys,
   preselectedApiKeyId,
+  initialTokenStats,
 }: Props) {
   const [selectedApiKeyId, setSelectedApiKeyId] = useState(
     preselectedApiKeyId || apiKeys[0]?.id || ''
@@ -49,23 +57,39 @@ export default function ChatInterface({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* API 키 선택 바 */}
+      {/* API 키 선택 바 & 토큰 사용량 */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2">
-        <div className="max-w-4xl mx-auto flex items-center gap-4">
-          <label className="text-sm text-gray-600 dark:text-gray-400">
-            API 키:
-          </label>
-          <select
-            value={selectedApiKeyId}
-            onChange={(e) => setSelectedApiKeyId(e.target.value)}
-            className="text-sm px-3 py-1 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-          >
-            {apiKeys.map((key) => (
-              <option key={key.id} value={key.id}>
-                {key.key_name} ({key.provider})
-              </option>
-            ))}
-          </select>
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <label className="text-sm text-gray-600 dark:text-gray-400">
+              API 키:
+            </label>
+            <select
+              value={selectedApiKeyId}
+              onChange={(e) => setSelectedApiKeyId(e.target.value)}
+              className="text-sm px-3 py-1 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+            >
+              {apiKeys.map((key) => (
+                <option key={key.id} value={key.id}>
+                  {key.key_name} ({key.provider})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 토큰 사용량 */}
+          <div className="flex items-center gap-3 text-sm">
+            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <span className="text-gray-600 dark:text-gray-400">총 토큰:</span>
+              <span className="font-semibold text-blue-600 dark:text-blue-400">
+                {initialTokenStats.total.toLocaleString()}
+              </span>
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              (입력: {initialTokenStats.prompt.toLocaleString()} |
+              출력: {initialTokenStats.completion.toLocaleString()})
+            </div>
+          </div>
         </div>
       </div>
 

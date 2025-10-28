@@ -57,6 +57,15 @@ export async function POST(req: Request) {
       return new Response('Character not found', { status: 404 })
     }
 
+    // 채팅 설정 가져오기 (컨텍스트 윈도우)
+    const { data: chat } = await supabase
+      .from('chats')
+      .select('max_context_messages')
+      .eq('id', chatId)
+      .single()
+
+    const maxContextMessages = chat?.max_context_messages || 20
+
     // Provider에 따라 모델 선택
     let model
     const modelName = apiKeyData.model_preference || getDefaultModel(provider)
@@ -87,10 +96,13 @@ export async function POST(req: Request) {
       content: character.system_prompt,
     }
 
+    // FIFO 컨텍스트 윈도우: 최근 N개 메시지만 사용
+    const recentMessages = messages.slice(-maxContextMessages)
+
     // 스트리밍 응답 생성
     const result = await streamText({
       model,
-      messages: [systemMessage, ...messages],
+      messages: [systemMessage, ...recentMessages],
       async onFinish({ text, usage }) {
         // 응답이 완료되면 메시지 저장
         try {

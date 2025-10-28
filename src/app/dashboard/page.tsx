@@ -21,6 +21,21 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single()
 
+  // 전체 토큰 사용량 통계 계산
+  const { data: allMessages } = await supabase
+    .from('messages')
+    .select('prompt_tokens, completion_tokens, chat_id, chats!inner(user_id)')
+    .eq('chats.user_id', user.id)
+
+  const totalTokenStats = allMessages?.reduce(
+    (acc, msg) => ({
+      total: acc.total + (msg.prompt_tokens || 0) + (msg.completion_tokens || 0),
+      prompt: acc.prompt + (msg.prompt_tokens || 0),
+      completion: acc.completion + (msg.completion_tokens || 0),
+    }),
+    { total: 0, prompt: 0, completion: 0 }
+  ) || { total: 0, prompt: 0, completion: 0 }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* 헤더 */}
@@ -54,6 +69,42 @@ export default async function DashboardPage() {
           <p className="text-gray-600 dark:text-gray-400">
             Phase 0 MVP - BYOK 기반 캐릭터 채팅 플랫폼
           </p>
+        </div>
+
+        {/* 토큰 사용량 통계 */}
+        <div className="mb-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold">토큰 사용량 통계</h3>
+            <svg className="w-8 h-8 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+              <div className="text-sm opacity-90 mb-1">총 사용량</div>
+              <div className="text-3xl font-bold">
+                {totalTokenStats.total.toLocaleString()}
+              </div>
+              <div className="text-xs opacity-75 mt-1">tokens</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+              <div className="text-sm opacity-90 mb-1">입력 토큰</div>
+              <div className="text-3xl font-bold">
+                {totalTokenStats.prompt.toLocaleString()}
+              </div>
+              <div className="text-xs opacity-75 mt-1">prompt tokens</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+              <div className="text-sm opacity-90 mb-1">출력 토큰</div>
+              <div className="text-3xl font-bold">
+                {totalTokenStats.completion.toLocaleString()}
+              </div>
+              <div className="text-xs opacity-75 mt-1">completion tokens</div>
+            </div>
+          </div>
+          <div className="mt-4 text-xs opacity-75">
+            💡 BYOK 방식으로 비용을 직접 관리하세요. Google Gemini 무료 티어: 월 15 RPM
+          </div>
         </div>
 
         {/* 퀵 액션 그리드 */}
