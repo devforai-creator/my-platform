@@ -2,7 +2,7 @@
 
 **Phase 0 (v0.1.2)** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
 
-[![Deploy Status](https://img.shields.io/badge/deploy-success-brightgreen)](https://mycharacterchatplatform-a4waju02p-sydebs-projects.vercel.app)
+[![Deploy Status](https://img.shields.io/badge/deploy-success-brightgreen)](https://mycharacterchatplatform.vercel.app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 프로젝트 개요
@@ -84,20 +84,38 @@
 
 ## 시작하기
 
-### 1. 레포지토리 클론
+### 빠른 시작 (추천)
+
+**5분이면 바로 사용 가능합니다:**
+
+1. **[플랫폼 접속](https://mycharacterchatplatform.vercel.app)**
+2. **회원가입** (이메일 + 비밀번호)
+3. **API 키 등록**
+   - [Google AI Studio](https://aistudio.google.com/app/apikey) - 무료 티어 제공 ⭐
+   - [OpenAI Platform](https://platform.openai.com/api-keys)
+   - [Anthropic Console](https://console.anthropic.com/settings/keys)
+4. **캐릭터 생성** 후 바로 채팅 시작!
+
+---
+
+### 개발자를 위한 셀프 호스팅 (선택)
+
+오픈소스이므로 본인의 인프라에서 직접 운영할 수 있습니다.
+
+#### 1. 레포지토리 클론
 
 ```bash
 git clone git@github.com:devforai-creator/my-platform.git
 cd my-platform
 ```
 
-### 2. 의존성 설치
+#### 2. 의존성 설치
 
 ```bash
 npm install
 ```
 
-### 3. Supabase 설정
+#### 3. Supabase 설정
 
 상세한 설정 가이드는 [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)를 참조하세요.
 
@@ -108,7 +126,7 @@ npm install
    - `supabase/migrations/01_vault_helpers.sql`
 3. Settings → API에서 API Keys 확인
 
-### 4. 환경 변수 설정
+#### 4. 환경 변수 설정
 
 `.env.local` 파일 생성:
 
@@ -118,7 +136,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
 
-### 5. 개발 서버 실행
+#### 5. 개발 서버 실행
 
 ```bash
 npm run dev
@@ -126,7 +144,7 @@ npm run dev
 
 브라우저에서 [http://localhost:3000](http://localhost:3000) 접속
 
-### 6. 프로덕션 빌드
+#### 6. 프로덕션 빌드
 
 ```bash
 npm run build
@@ -255,13 +273,15 @@ GitHub에 push하면 자동으로 Vercel에 배포됩니다.
 - 개발자가 "다른 코드"를 슬쩍 끼워넣을 수 없습니다
 - 배포 로그는 Vercel 대시보드에서 확인 가능합니다
 
-#### 3. **오픈소스 = 셀프 호스팅**
-- 그래도 못 믿겠다면? **정답입니다.**
-- 이 저장소를 Fork하고 본인의 Vercel 계정에 직접 배포하세요
+#### 3. **오픈소스 = 투명성과 선택권**
+- 그래도 못 믿겠다면? **합리적인 선택입니다.**
+- 이 저장소를 Fork하고 본인의 Vercel 계정에 직접 배포할 수 있습니다
 - 10분이면 완료되고 비용도 무료입니다
-- 본인이 직접 운영하는 서버에서만 사용하세요
 
-**오픈소스의 의미**: "코드를 구경하라"가 아니라 **"직접 배포해서 쓰라"**입니다.
+**오픈소스의 장점**:
+- ✅ **투명성**: 모든 코드를 직접 확인 가능
+- ✅ **선택권**: 공식 플랫폼 또는 셀프 호스팅
+- ✅ **신뢰**: "믿으라"가 아니라 "확인하세요"
 
 ---
 
