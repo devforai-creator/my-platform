@@ -11,6 +11,40 @@ This project utilizes two AI agents for development:
 
 When reviewing code or making changes, be aware that both agents may have contributed to different parts of the codebase.
 
+## Security Review Workflow
+
+**중요**: 보안 관련 코드를 직접 리뷰하는 건 현실적으로 어렵습니다.
+대신 **배포 전 Codex 보안 리뷰를 필수**로 진행합니다.
+
+### 배포 전 체크리스트
+1. 기능 개발 완료 (Claude Code)
+2. `npm run lint` 통과
+3. `npm run build` 성공
+4. **Codex 보안 리뷰** ⭐
+5. 보안 이슈 수정
+6. 배포
+
+### Codex 리뷰 요청 방법
+터미널에서: `codex review --security`
+
+또는 Claude Code에게: "Codex한테 보안 리뷰 맡겨줘"
+
+### Security Patterns for AI (필수 참고)
+
+**Server Action 작성 시**:
+- [ ] `auth.getUser()` 검증 필수
+- [ ] `user_id` 기반 필터링으로 소유권 확인
+- [ ] 클라이언트 입력을 그대로 믿지 말 것 (서버에서 재검증)
+
+**RPC 함수 작성 시**:
+- [ ] `SECURITY DEFINER` 사용 시 반드시 `auth.uid()` 검증
+- [ ] 다른 사용자의 데이터 접근 불가능하도록 보호
+
+**API 라우트 작성 시**:
+- [ ] 입력 검증 (zod 등 활용)
+- [ ] 인증 확인
+- [ ] 리소스 소유권 확인 (다른 사용자의 chat/character 접근 불가)
+
 ## Project Overview
 
 CharacterChat Platform - A BYOK (Bring Your Own Key) character chat platform built with Next.js 15, Supabase, and Vercel AI SDK. Users register their own API keys (Google, OpenAI, Anthropic) to chat with custom AI characters. Currently at Phase 0 (v0.1.2).
