@@ -1,6 +1,6 @@
 # CharacterChat Platform
 
-**Phase 0 MVP (v0.1.0)** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
+**Phase 0 (v0.1.1)** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
 
 [![Deploy Status](https://img.shields.io/badge/deploy-success-brightgreen)](https://mycharacterchatplatform-a4waju02p-sydebs-projects.vercel.app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -35,8 +35,9 @@
 
 ✅ **실시간 채팅**
 - 스트리밍 응답 (AI SDK)
+- FIFO 컨텍스트 윈도우 (최근 20개 메시지)
 - 자동 메시지 저장
-- 토큰 사용량 추적
+- 토큰 사용량 실시간 추적 및 통계
 - 자동 스크롤
 
 ## 기술 스택

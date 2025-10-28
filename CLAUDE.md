@@ -239,11 +239,17 @@ export default function MyComponent() {
 - `store_encrypted_secret(secret_name, secret_value)` - Store API key
 - `get_decrypted_secret(secret_name)` - Retrieve API key (server-only!)
 
-## Known Issues & Limitations (v0.1.0)
+## Recent Updates (v0.1.1 - 2025-10-28)
 
-- **No FIFO Context Window**: All messages sent to LLM (no token limit management)
-- **No Token Statistics**: Usage tracking exists but no dashboard
-- **Mobile Optimization**: Basic responsiveness, needs improvement
+✅ **FIFO Context Window**: Recent 20 messages sent to LLM (configurable via `chats.max_context_messages`)
+✅ **Token Statistics**: Real-time display in chat interface + dashboard statistics card
+✅ **Cost Monitoring**: Users can now track token usage to manage API costs
+
+## Known Issues & Limitations (v0.1.1)
+
+- **Fixed Context Window**: Currently hardcoded to 20 messages, no UI to customize
+- **No Chat Export**: Cannot export chat history yet
+- **Token History**: Only cumulative stats, no time-series graphs
 
 See ROADMAP.md for planned features in v0.2.0+
 

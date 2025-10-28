@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2025-10-28
+
+### 🚀 홍보 전 필수 패치
+
+v0.1.0의 치명적인 비용 문제를 해결하고 사용자 신뢰성을 위한 토큰 모니터링 기능을 추가했습니다.
+
+### Added
+
+#### FIFO 컨텍스트 윈도우
+- 최근 N개 메시지만 LLM에 전송 (기본값: 20개)
+- `chats.max_context_messages` DB 필드 활용
+- `/api/chat/route.ts`에서 `messages.slice(-maxContextMessages)` 구현
+- **효과**: 긴 대화에서 토큰 비용 대폭 절감
+
+#### 토큰 사용량 통계
+- **채팅 화면 실시간 표시** (`ChatInterface.tsx`):
+  - API 키 선택 바 우측에 토큰 통계 배치
+  - 총 토큰, 입력 토큰, 출력 토큰 구분 표시
+  - 숫자 천 단위 콤마 포맷팅
+- **대시보드 통계 카드** (`dashboard/page.tsx`):
+  - 그래디언트 디자인 (파란색→보라색)
+  - 전체 계정 토큰 사용량 집계
+  - 3개 박스로 구분: 총/입력/출력
+  - Google Gemini 무료 티어 안내 문구
+
+### Changed
+- 채팅 로직: 모든 메시지 전송 → FIFO 컨텍스트 윈도우 적용
+- 대시보드 UI: 토큰 통계 카드 추가 (환영 메시지 아래)
+
+### Technical Details
+- Server Component에서 토큰 집계 (DB 쿼리 최적화)
+- `messages` 테이블의 `prompt_tokens`, `completion_tokens` 필드 활용
+- Supabase join으로 사용자별 메시지 필터링
+
+### Fixed
+- **토큰 폭탄 방지**: 긴 대화에서 전체 히스토리 전송으로 인한 비용 증가 문제 해결
+- **비용 가시성**: 사용자가 API 비용을 실시간으로 모니터링 가능
+
+### Documentation
+- README.md: v0.1.1로 버전 업데이트, 주요 기능에 컨텍스트 윈도우 & 토큰 통계 추가
+- ROADMAP.md: v0.1.1 섹션 추가, Known Issues 업데이트
+- CLAUDE.md: Recent Updates 섹션 추가
+- package.json: 버전 0.1.1로 업데이트
+
+### Notes
+- 이 패치로 **홍보 준비 완료**: 사용자 신뢰를 위한 최소 요구사항 충족
+- 컨텍스트 윈도우 크기는 현재 고정 (UI 커스터마이징은 v0.2.0 예정)
+
+---
+
 ## [0.1.0] - 2025-10-27
 
 ### 🎉 Phase 0 MVP Release
@@ -130,9 +180,8 @@ Phase 0 MVP 완성! BYOK 기반 캐릭터 채팅 플랫폼의 핵심 기능이 �
 - `useChat` hook 통합
 
 ### Known Issues
-- **FIFO 컨텍스트 윈도우 미구현**: 현재 모든 메시지를 LLM에 전송 (v0.2.0에서 개선 예정)
-  - 대화가 길어질수록 토큰 비용 증가 및 속도 저하
-  - 모델 context size 초과 시 API 에러 발생 가능
+- ~~**FIFO 컨텍스트 윈도우 미구현**~~ → ✅ v0.1.1에서 해결
+- ~~**토큰 사용량 통계 없음**~~ → ✅ v0.1.1에서 해결
 - Supabase Realtime.js Edge Runtime 경고 (기능에는 영향 없음)
 - NSFW 콘텐츠 Google Gemini 검열 (provider 특성)
 
@@ -174,4 +223,5 @@ Phase 0 MVP의 모든 핵심 기능이 완성되었습니다! 사용자는 이�
 
 ---
 
+[0.1.1]: https://github.com/devforai-creator/my-platform/releases/tag/v0.1.1
 [0.1.0]: https://github.com/devforai-creator/my-platform/releases/tag/v0.1.0
