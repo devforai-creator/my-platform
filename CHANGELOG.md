@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Vercel 빌드가 실패했던 `any` 사용과 인용부호 관련 ESLint 오류를 해결했습니다 (`AddApiKeyForm`, `ChatInterface`, `NewChatForm`, `CharacterCard`, `chats/page`).
+- API 키 삭제 시 Vault에 orphaned secrets가 남는 문제를 해결했습니다 (`supabase/migrations/02_update_vault_delete_secret.sql`). `delete_secret` RPC 함수가 이제 api_keys row 삭제 후에도 secret 이름 prefix 검증을 통해 Vault secret을 정상적으로 삭제합니다.
 
 ---
 
