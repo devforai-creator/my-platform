@@ -1,6 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import type { Database } from '@/types/database.types'
+
+type ChatListItem = Database['public']['Tables']['chats']['Row'] & {
+  characters: Pick<
+    Database['public']['Tables']['characters']['Row'],
+    'id' | 'name' | 'avatar_url'
+  > | null
+}
 
 export default async function ChatsPage() {
   const supabase = await createClient()
@@ -26,6 +34,8 @@ export default async function ChatsPage() {
     `)
     .eq('user_id', user.id)
     .order('updated_at', { ascending: false })
+
+  const chatList = (chats ?? []) as ChatListItem[]
 
   // 활성 API 키 확인
   const { data: apiKeys } = await supabase
@@ -84,9 +94,9 @@ export default async function ChatsPage() {
         )}
 
         {/* 채팅 목록 */}
-        {chats && chats.length > 0 ? (
+        {chatList.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {chats.map((chat: any) => (
+            {chatList.map((chat) => (
               <Link
                 key={chat.id}
                 href={`/dashboard/chats/${chat.id}`}

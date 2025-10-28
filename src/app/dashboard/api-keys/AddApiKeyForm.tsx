@@ -9,6 +9,8 @@ const PROVIDERS = [
   { value: 'anthropic', label: 'Anthropic (Claude)', recommended: false },
 ] as const
 
+type ProviderValue = (typeof PROVIDERS)[number]['value']
+
 const MODELS = {
   google: [
     'gemini-2.5-pro',
@@ -28,7 +30,7 @@ const MODELS = {
 }
 
 export default function AddApiKeyForm() {
-  const [provider, setProvider] = useState<'google' | 'openai' | 'anthropic'>('google')
+  const [provider, setProvider] = useState<ProviderValue>('google')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -79,7 +81,7 @@ export default function AddApiKeyForm() {
           <select
             name="provider"
             value={provider}
-            onChange={(e) => setProvider(e.target.value as any)}
+            onChange={(e) => setProvider(e.target.value as ProviderValue)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
           >
             {PROVIDERS.map((p) => (

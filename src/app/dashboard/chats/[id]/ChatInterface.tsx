@@ -149,10 +149,10 @@ export default function ChatInterface({
             <textarea
               value={input}
               onChange={handleInputChange}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSubmit(e as any)
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault()
+                  void handleSubmit()
                 }
               }}
               placeholder="메시지를 입력하세요... (Shift+Enter로 줄바꿈)"

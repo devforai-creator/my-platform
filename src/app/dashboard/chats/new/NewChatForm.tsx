@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import type { FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Character, ApiKey } from '@/types/database.types'
@@ -24,7 +25,7 @@ export default function NewChatForm({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     setError(null)
@@ -71,8 +72,10 @@ export default function NewChatForm({
 
       // 채팅 페이지로 이동 (API 키 ID 전달)
       router.push(`/dashboard/chats/${chat.id}?apiKey=${apiKeyId}`)
-    } catch (err: any) {
-      setError(err.message || '채팅 생성에 실패했습니다')
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : '채팅 생성에 실패했습니다'
+      setError(message)
       setLoading(false)
     }
   }
@@ -118,7 +121,9 @@ export default function NewChatForm({
               </p>
               {selectedCharacter.greeting_message && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-                  첫 인사: "{selectedCharacter.greeting_message}"
+                  첫 인사: <span>&quot;</span>
+                  {selectedCharacter.greeting_message}
+                  <span>&quot;</span>
                 </p>
               )}
             </div>

@@ -13,7 +13,7 @@ export default function CharacterCard({ character }: Props) {
   const [deleting, setDeleting] = useState(false)
 
   async function handleDelete() {
-    if (!confirm(`"${character.name}"을(를) 정말 삭제하시겠습니까?`)) {
+    if (!confirm(`'${character.name}'을(를) 정말 삭제하시겠습니까?`)) {
       return
     }
 
@@ -55,7 +55,9 @@ export default function CharacterCard({ character }: Props) {
               첫 인사말
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400 italic line-clamp-2">
-              "{character.greeting_message}"
+              <span>&quot;</span>
+              {character.greeting_message}
+              <span>&quot;</span>
             </p>
           </div>
         )}
