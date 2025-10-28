@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2025-10-29
+
+### Security
+- Vault RPC 함수에 `auth.uid()` 기반 소유권 검증을 추가해 외부 사용자가 임의 API 키를 복호화/삭제하지 못하도록 차단했습니다 (`supabase/migrations/01_vault_helpers.sql`).
+- 서버 액션에서 `vault_secret_name`을 더 이상 클라이언트로 노출하지 않고, 삭제/토글 시 서버가 직접 조회하도록 변경했습니다 (`src/app/dashboard/api-keys/actions.ts` 등).
+- `/api/chat` 엔드포인트가 요청 바디를 검증하고, 소유한 `chat`과 연결된 캐릭터·모델만 사용하도록 강화했습니다. 잘못된 입력에 대해 400/404를 반환합니다.
+
+### Fixed
+- Vercel 빌드가 실패했던 `any` 사용과 인용부호 관련 ESLint 오류를 해결했습니다 (`AddApiKeyForm`, `ChatInterface`, `NewChatForm`, `CharacterCard`, `chats/page`).
+
+---
+
 ## [0.1.1] - 2025-10-28
 
 ### 🚀 홍보 전 필수 패치

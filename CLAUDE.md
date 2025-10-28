@@ -239,13 +239,23 @@ export default function MyComponent() {
 - `store_encrypted_secret(secret_name, secret_value)` - Store API key
 - `get_decrypted_secret(secret_name)` - Retrieve API key (server-only!)
 
-## Recent Updates (v0.1.1 - 2025-10-28)
+## Recent Updates
+
+### v0.1.2 (2025-10-29) - Security Patch
+
+🔒 **Critical Security Fixes**:
+- Vault RPC functions now verify `auth.uid()` ownership before decrypting/deleting secrets
+- `vault_secret_name` no longer exposed to client - server-side lookups only
+- `/api/chat` endpoint hardened with request validation and chat ownership checks
+- TypeScript strictness improved (ESLint issues resolved)
+
+### v0.1.1 (2025-10-28) - Core Features
 
 ✅ **FIFO Context Window**: Recent 20 messages sent to LLM (configurable via `chats.max_context_messages`)
 ✅ **Token Statistics**: Real-time display in chat interface + dashboard statistics card
 ✅ **Cost Monitoring**: Users can now track token usage to manage API costs
 
-## Known Issues & Limitations (v0.1.1)
+## Known Issues & Limitations (v0.1.2)
 
 - **Fixed Context Window**: Currently hardcoded to 20 messages, no UI to customize
 - **No Chat Export**: Cannot export chat history yet
