@@ -25,9 +25,8 @@ When reviewing code or making changes, be aware that both agents may have contri
 6. 배포
 
 ### Codex 리뷰 요청 방법
-터미널에서: `codex review --security`
-
-또는 Claude Code에게: "Codex한테 보안 리뷰 맡겨줘"
+배포 전 Codex에게 보안 리뷰를 요청합니다.
+구체적인 호출 방법은 Codex 사용 환경에 따라 다릅니다.
 
 ### Security Patterns for AI (필수 참고)
 
