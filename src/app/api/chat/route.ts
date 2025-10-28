@@ -9,7 +9,51 @@ export const maxDuration = 60 // 60초 타임아웃
 
 export async function POST(req: Request) {
   try {
-    const { messages, chatId, characterId, provider, apiKeyId } = await req.json()
+    const body = await req.json().catch(() => null)
+
+    if (!body || typeof body !== 'object') {
+      return new Response('Invalid request body', { status: 400 })
+    }
+
+    const { messages, chatId, apiKeyId } = body as {
+      messages?: Array<{ role?: string; content?: unknown }>
+      chatId?: unknown
+      apiKeyId?: unknown
+    }
+
+    if (typeof chatId !== 'string' || !chatId) {
+      return new Response('Invalid chatId', { status: 400 })
+    }
+
+    if (typeof apiKeyId !== 'string' || !apiKeyId) {
+      return new Response('Invalid apiKeyId', { status: 400 })
+    }
+
+    const sanitizedMessages = Array.isArray(messages)
+      ? messages
+          .filter(
+            (message): message is { role: string; content: string } =>
+              typeof message === 'object' &&
+              message !== null &&
+              typeof message.role === 'string' &&
+              typeof message.content === 'string'
+          )
+          .map((message) => ({
+            role: message.role as 'user' | 'assistant' | 'system',
+            content: message.content,
+          }))
+          .filter((message) => message.role === 'user' || message.role === 'assistant')
+      : []
+
+    if (sanitizedMessages.length === 0) {
+      return new Response('Messages array required', { status: 400 })
+    }
+
+    const lastMessage = sanitizedMessages[sanitizedMessages.length - 1]
+
+    if (lastMessage.role !== 'user' || !lastMessage.content.trim()) {
+      return new Response('Last message must be a non-empty user message', { status: 400 })
+    }
 
     const supabase = await createClient()
 
@@ -46,28 +90,34 @@ export async function POST(req: Request) {
 
     const decryptedApiKey = secretData as string
 
-    // 캐릭터 정보 가져오기
-    const { data: character } = await supabase
-      .from('characters')
-      .select('*')
-      .eq('id', characterId)
+    // 채팅 정보 가져오기 (소유권 확인)
+    const { data: chat, error: chatError } = await supabase
+      .from('chats')
+      .select('id, character_id, max_context_messages')
+      .eq('id', chatId)
+      .eq('user_id', user.id)
       .single()
 
-    if (!character) {
+    if (chatError || !chat) {
+      return new Response('Chat not found', { status: 404 })
+    }
+
+    // 캐릭터 정보 가져오기
+    const { data: character, error: characterError } = await supabase
+      .from('characters')
+      .select('id, system_prompt')
+      .eq('id', chat.character_id)
+      .single()
+
+    if (characterError || !character) {
       return new Response('Character not found', { status: 404 })
     }
 
-    // 채팅 설정 가져오기 (컨텍스트 윈도우)
-    const { data: chat } = await supabase
-      .from('chats')
-      .select('max_context_messages')
-      .eq('id', chatId)
-      .single()
-
-    const maxContextMessages = chat?.max_context_messages || 20
+    const maxContextMessages = chat.max_context_messages || 20
 
     // Provider에 따라 모델 선택
     let model
+    const provider = apiKeyData.provider
     const modelName = apiKeyData.model_preference || getDefaultModel(provider)
 
     switch (provider) {
@@ -97,7 +147,7 @@ export async function POST(req: Request) {
     }
 
     // FIFO 컨텍스트 윈도우: 최근 N개 메시지만 사용
-    const recentMessages = messages.slice(-maxContextMessages)
+    const recentMessages = sanitizedMessages.slice(-maxContextMessages)
 
     // 스트리밍 응답 생성
     const result = await streamText({
@@ -107,7 +157,12 @@ export async function POST(req: Request) {
         // 응답이 완료되면 메시지 저장
         try {
           // 사용자 메시지 저장
-          const userMessage = messages[messages.length - 1]
+          const userMessage = sanitizedMessages[sanitizedMessages.length - 1]
+
+          if (userMessage.role !== 'user') {
+            return
+          }
+
           await supabase.from('messages').insert({
             chat_id: chatId,
             role: 'user',

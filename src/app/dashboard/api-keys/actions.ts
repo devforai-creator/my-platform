@@ -53,7 +53,7 @@ export async function createApiKey(formData: FormData) {
   return { success: true }
 }
 
-export async function deleteApiKey(id: string, vaultSecretName: string) {
+export async function deleteApiKey(id: string) {
   const supabase = await createClient()
 
   const {
@@ -64,15 +64,36 @@ export async function deleteApiKey(id: string, vaultSecretName: string) {
     return { error: '로그인이 필요합니다' }
   }
 
+  const { data: apiKeyRecord, error: fetchError } = await supabase
+    .from('api_keys')
+    .select('vault_secret_name')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .single()
+
+  if (fetchError || !apiKeyRecord) {
+    return { error: 'API 키를 찾을 수 없습니다' }
+  }
+
   // DB에서 삭제 (RLS가 소유권 확인)
-  const { error } = await supabase.from('api_keys').delete().eq('id', id)
+  const { error } = await supabase
+    .from('api_keys')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id)
 
   if (error) {
     return { error: 'API 키 삭제 실패: ' + error.message }
   }
 
   // Vault에서도 삭제
-  await supabase.rpc('delete_secret', { secret_name: vaultSecretName })
+  const { error: vaultError } = await supabase.rpc('delete_secret', {
+    secret_name: apiKeyRecord.vault_secret_name,
+  })
+
+  if (vaultError) {
+    console.error('Vault delete error:', vaultError)
+  }
 
   revalidatePath('/dashboard/api-keys')
   return { success: true }
@@ -81,10 +102,19 @@ export async function deleteApiKey(id: string, vaultSecretName: string) {
 export async function toggleApiKey(id: string, isActive: boolean) {
   const supabase = await createClient()
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: '로그인이 필요합니다' }
+  }
+
   const { error } = await supabase
     .from('api_keys')
     .update({ is_active: !isActive })
     .eq('id', id)
+    .eq('user_id', user.id)
 
   if (error) {
     return { error: '상태 변경 실패: ' + error.message }

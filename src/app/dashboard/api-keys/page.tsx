@@ -18,7 +18,9 @@ export default async function ApiKeysPage() {
   // API 키 목록 가져오기
   const { data: apiKeys, error } = await supabase
     .from('api_keys')
-    .select('*')
+    .select(
+      'id, provider, key_name, model_preference, is_active, usage_notes, last_used_at, created_at, updated_at'
+    )
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 

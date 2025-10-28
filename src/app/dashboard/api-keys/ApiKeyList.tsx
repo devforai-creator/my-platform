@@ -5,7 +5,7 @@ import type { ApiKey } from '@/types/database.types'
 import { deleteApiKey, toggleApiKey } from './actions'
 
 interface Props {
-  apiKeys: ApiKey[]
+  apiKeys: ApiKeyListItem[]
 }
 
 const PROVIDER_COLORS = {
@@ -20,16 +20,18 @@ const PROVIDER_LABELS = {
   anthropic: 'Anthropic',
 }
 
+type ApiKeyListItem = Omit<ApiKey, 'vault_secret_name' | 'user_id'>
+
 export default function ApiKeyList({ apiKeys }: Props) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  async function handleDelete(id: string, vaultSecretName: string) {
+  async function handleDelete(id: string) {
     if (!confirm('정말 이 API 키를 삭제하시겠습니까?')) {
       return
     }
 
     setDeletingId(id)
-    await deleteApiKey(id, vaultSecretName)
+    await deleteApiKey(id)
     setDeletingId(null)
   }
 
@@ -108,7 +110,7 @@ export default function ApiKeyList({ apiKeys }: Props) {
                 {key.is_active ? '비활성화' : '활성화'}
               </button>
               <button
-                onClick={() => handleDelete(key.id, key.vault_secret_name)}
+                onClick={() => handleDelete(key.id)}
                 disabled={deletingId === key.id}
                 className="px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-50"
               >

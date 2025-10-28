@@ -12,16 +12,16 @@ interface TokenStats {
 
 interface Props {
   chatId: string
-  characterId: string
   initialMessages: Message[]
-  apiKeys: ApiKey[]
+  apiKeys: ApiKeyOption[]
   preselectedApiKeyId?: string
   initialTokenStats: TokenStats
 }
 
+type ApiKeyOption = Pick<ApiKey, 'id' | 'key_name' | 'provider' | 'model_preference'>
+
 export default function ChatInterface({
   chatId,
-  characterId,
   initialMessages,
   apiKeys,
   preselectedApiKeyId,
@@ -44,7 +44,6 @@ export default function ChatInterface({
     })),
     body: {
       chatId,
-      characterId,
       provider: selectedApiKey?.provider,
       apiKeyId: selectedApiKeyId,
     },

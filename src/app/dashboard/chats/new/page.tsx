@@ -30,7 +30,7 @@ export default async function NewChatPage({ searchParams }: Props) {
   // API 키 목록
   const { data: apiKeys } = await supabase
     .from('api_keys')
-    .select('*')
+    .select('id, key_name, provider, model_preference')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .order('provider')

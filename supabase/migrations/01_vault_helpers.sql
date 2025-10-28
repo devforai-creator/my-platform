@@ -25,6 +25,21 @@ language plpgsql
 security definer
 as $$
 begin
+  if auth.uid() is null then
+    raise exception 'Not authorized'
+      using errcode = '42501';
+  end if;
+
+  if not exists (
+    select 1
+    from public.api_keys
+    where vault_secret_name = secret_name
+      and user_id = auth.uid()
+  ) then
+    raise exception 'Not authorized'
+      using errcode = '42501';
+  end if;
+
   delete from vault.secrets where name = secret_name;
 end;
 $$;
@@ -38,9 +53,29 @@ as $$
 declare
   secret_value text;
 begin
+  if auth.uid() is null then
+    raise exception 'Not authorized'
+      using errcode = '42501';
+  end if;
+
+  if not exists (
+    select 1
+    from public.api_keys
+    where vault_secret_name = secret_name
+      and user_id = auth.uid()
+  ) then
+    raise exception 'Not authorized'
+      using errcode = '42501';
+  end if;
+
   select decrypted_secret into secret_value
   from vault.decrypted_secrets
   where name = secret_name;
+
+  if secret_value is null then
+    raise exception 'Secret not found'
+      using errcode = 'P0002';
+  end if;
 
   return secret_value;
 end;

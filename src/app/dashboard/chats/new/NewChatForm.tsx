@@ -7,9 +7,11 @@ import type { Character, ApiKey } from '@/types/database.types'
 
 interface Props {
   characters: Character[]
-  apiKeys: ApiKey[]
+  apiKeys: ApiKeyOption[]
   preselectedCharacterId?: string
 }
+
+type ApiKeyOption = Pick<ApiKey, 'id' | 'key_name' | 'provider' | 'model_preference'>
 
 export default function NewChatForm({
   characters,

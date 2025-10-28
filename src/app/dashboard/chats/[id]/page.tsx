@@ -64,7 +64,7 @@ export default async function ChatPage({ params, searchParams }: Props) {
   // API 키 목록 가져오기
   const { data: apiKeys } = await supabase
     .from('api_keys')
-    .select('*')
+    .select('id, key_name, provider, model_preference')
     .eq('user_id', user.id)
     .eq('is_active', true)
 
@@ -99,7 +99,6 @@ export default async function ChatPage({ params, searchParams }: Props) {
       {/* 채팅 인터페이스 */}
       <ChatInterface
         chatId={chat.id}
-        characterId={chat.characters.id}
         initialMessages={messages || []}
         apiKeys={apiKeys || []}
         preselectedApiKeyId={preselectedApiKeyId}
