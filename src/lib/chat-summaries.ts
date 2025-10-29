@@ -10,6 +10,12 @@ const SUMMARY_GROUP_SIZE = 10
 const SUMMARY_LEVEL_CHUNK = 0
 const SUMMARY_LEVEL_META = 1
 
+const CHUNK_SUMMARY_MAX_TOKENS = 320
+const META_SUMMARY_MAX_TOKENS = 420
+const MESSAGE_CHAR_LIMIT = 1200
+const FALLBACK_SUMMARY_CHAR_LIMIT = 700
+const FALLBACK_RECENT_MESSAGES = 5
+
 const CHUNK_SUMMARY_SYSTEM_PROMPT =
   'You are a diligent note-taking assistant. Summarize the following chat segment focusing on key facts, decisions, action items, and follow-ups. Omit greetings and filler. Respond in the predominant language of the excerpt. Keep it concise.'
 
@@ -143,6 +149,7 @@ export async function updateSummaries({
 }: UpdateSummariesOptions): Promise<void> {
   try {
     const totalMessages = await getMessageCount(supabase, chatId)
+    console.log('[summaries] total messages', totalMessages, 'for chat', chatId)
 
     if (totalMessages === null || totalMessages < CHUNK_SIZE * 2) {
       return
@@ -296,15 +303,24 @@ async function createChunkSummary({
     )
   }
 
-  const formattedTranscript = chunkMessages
+  const sanitizedChunk = chunkMessages.map((msg) => ({
+    role: msg.role,
+    content: truncateText(msg.content, MESSAGE_CHAR_LIMIT),
+  })) as MessageTranscriptRow[]
+
+  const formattedTranscript = sanitizedChunk
     .map((msg) => `${msg.role.toUpperCase()}: ${msg.content}`)
     .join('\n')
 
-  const { text, usage } = await generateText({
+  console.log('[summaries] summarizing chunk', startSeq, endSeq, 'for chat', chatId)
+
+  const { summaryText, tokenCount } = await generateSummaryWithFallback({
     model,
-    system: CHUNK_SUMMARY_SYSTEM_PROMPT,
+    systemPrompt: CHUNK_SUMMARY_SYSTEM_PROMPT,
     prompt: `Summarize the following conversation segment:\n\n${formattedTranscript}`,
-    maxTokens: 160,
+    maxTokens: CHUNK_SUMMARY_MAX_TOKENS,
+    fallbackLabel: `chunk ${startSeq}-${endSeq}`,
+    fallbackTextFactory: () => buildChunkFallbackSummary(sanitizedChunk),
   })
 
   await supabase
@@ -314,8 +330,8 @@ async function createChunkSummary({
       level: SUMMARY_LEVEL_CHUNK,
       start_seq: startSeq,
       end_seq: endSeq,
-      summary: text.trim(),
-      token_count: usage?.completionTokens ?? null,
+      summary: summaryText,
+      token_count: tokenCount,
     })
 }
 
@@ -416,15 +432,20 @@ async function createMetaSummary({
   const combinedText = chunks
     .map(
       (chunk) =>
-        `Messages ${chunk.start_seq}-${chunk.end_seq}:\n${chunk.summary.trim()}`
+        `Messages ${chunk.start_seq}-${chunk.end_seq}:\n${truncateText(
+          chunk.summary.trim(),
+          MESSAGE_CHAR_LIMIT
+        )}`
     )
     .join('\n\n')
 
-  const { text, usage } = await generateText({
+  const { summaryText, tokenCount } = await generateSummaryWithFallback({
     model,
-    system: META_SUMMARY_SYSTEM_PROMPT,
+    systemPrompt: META_SUMMARY_SYSTEM_PROMPT,
     prompt: `Create a concise higher-level summary of the following conversation chunks:\n\n${combinedText}`,
-    maxTokens: 220,
+    maxTokens: META_SUMMARY_MAX_TOKENS,
+    fallbackLabel: `meta ${startSeq}-${endSeq}`,
+    fallbackTextFactory: () => buildMetaFallbackSummary(chunks),
   })
 
   await supabase
@@ -434,9 +455,83 @@ async function createMetaSummary({
       level: SUMMARY_LEVEL_META,
       start_seq: startSeq,
       end_seq: endSeq,
-      summary: text.trim(),
-      token_count: usage?.completionTokens ?? null,
+      summary: summaryText,
+      token_count: tokenCount,
     })
+}
+
+interface SummaryWithFallbackOptions {
+  model: LanguageModel
+  systemPrompt: string
+  prompt: string
+  maxTokens: number
+  fallbackLabel: string
+  fallbackTextFactory: () => string
+}
+
+async function generateSummaryWithFallback({
+  model,
+  systemPrompt,
+  prompt,
+  maxTokens,
+  fallbackLabel,
+  fallbackTextFactory,
+}: SummaryWithFallbackOptions): Promise<{ summaryText: string; tokenCount: number | null }> {
+  try {
+    const { text, usage } = await generateText({
+      model,
+      system: systemPrompt,
+      prompt,
+      maxTokens,
+      temperature: 0,
+    })
+    const summaryText = text.trim()
+    if (!summaryText) {
+      throw new Error('Empty summary text returned from model')
+    }
+    return {
+      summaryText,
+      tokenCount: usage?.completionTokens ?? null,
+    }
+  } catch (error) {
+    console.error(`[summaries] LLM summary failed (${fallbackLabel})`, error)
+    const fallbackText = fallbackTextFactory()
+    return {
+      summaryText: fallbackText,
+      tokenCount: null,
+    }
+  }
+}
+
+function buildChunkFallbackSummary(messages: MessageTranscriptRow[]): string {
+  const highlights = messages
+    .slice(-FALLBACK_RECENT_MESSAGES)
+    .map((msg) => {
+      const speaker = msg.role === 'user' ? '사용자' : 'AI'
+      return `${speaker}: ${truncateText(msg.content, 140)}`
+    })
+
+  const summary = `요약 실패 – 최근 대화 하이라이트:\n- ${highlights.join('\n- ')}`
+  return truncateText(summary, FALLBACK_SUMMARY_CHAR_LIMIT)
+}
+
+function buildMetaFallbackSummary(
+  chunks: Array<Pick<ChatSummary, 'start_seq' | 'end_seq' | 'summary'>>
+): string {
+  const lines = chunks.map((chunk) => {
+    const range = `${chunk.start_seq}-${chunk.end_seq}`
+    return `[${range}] ${truncateText(chunk.summary, 160)}`
+  })
+
+  const summary = `요약 실패 – 기존 청크 요약을 그대로 참조하세요:\n${lines.join('\n')}`
+  return truncateText(summary, FALLBACK_SUMMARY_CHAR_LIMIT)
+}
+
+function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) {
+    return text
+  }
+  return `${text.slice(0, maxLength - 1).trimEnd()}…`
 }
 
 export const SUMMARY_CONFIG = {
