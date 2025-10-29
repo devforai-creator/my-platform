@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { ChatSummariesSupabaseClient } from './chat-summaries'
 import {
   buildContext,
   calculateChunkBoundaries,
@@ -8,33 +9,33 @@ import {
   type SanitizedMessage,
 } from './chat-summaries'
 
-function createSupabaseStub<T>(data: T) {
+function createSupabaseStub<T>(data: T): ChatSummariesSupabaseClient {
+  const query = {
+    select() {
+      return query
+    },
+    eq() {
+      return query
+    },
+    lte() {
+      return query
+    },
+    order() {
+      return query
+    },
+    data,
+    error: null,
+  }
+
   return {
     from(table: string) {
       if (table !== 'chat_summaries') {
         throw new Error(`Unexpected table: ${table}`)
       }
 
-      const query = {
-        select() {
-          return query
-        },
-        eq() {
-          return query
-        },
-        lte() {
-          return query
-        },
-        order() {
-          return query
-        },
-        data,
-        error: null,
-      }
-
       return query
     },
-  } as unknown
+  } as unknown as ChatSummariesSupabaseClient
 }
 
 function makeMessages(count: number): SanitizedMessage[] {
@@ -109,7 +110,7 @@ describe('buildContext', () => {
     const messages = makeMessages(5)
 
     const result = await buildContext({
-      supabase: supabase as any,
+      supabase,
       chatId: 'chat-1',
       sanitizedMessages: messages,
       baseSystemPrompt: 'BASE PROMPT',
@@ -138,7 +139,7 @@ describe('buildContext', () => {
     const messages = makeMessages(25)
 
     const result = await buildContext({
-      supabase: supabase as any,
+      supabase,
       chatId: 'chat-1',
       sanitizedMessages: messages,
       baseSystemPrompt: 'BASE PROMPT',

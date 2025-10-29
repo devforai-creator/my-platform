@@ -1,10 +1,7 @@
 import { generateText } from 'ai'
 import type { LanguageModel } from 'ai'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type {
-  Database,
-  ChatSummary,
-} from '@/types/database.types'
+import type { ChatSummary, ChatSummaryInsert, Message } from '@/types/database.types'
+import type { createClient as createServerClient } from '@/lib/supabase/server'
 
 const CONTEXT_WINDOW = 20
 const CHUNK_SIZE = 10
@@ -21,13 +18,19 @@ const META_SUMMARY_SYSTEM_PROMPT =
 
 type ChatRole = 'user' | 'assistant'
 
+type SummaryRow = Pick<ChatSummary, 'level' | 'start_seq' | 'end_seq' | 'summary'>
+type ChunkSummaryRow = Pick<ChatSummary, 'id' | 'start_seq' | 'end_seq' | 'summary'>
+type MessageTranscriptRow = Pick<Message, 'role' | 'content'>
+type ServerSupabaseClient = Awaited<ReturnType<typeof createServerClient>>
+export type ChatSummariesSupabaseClient = ServerSupabaseClient
+
 export interface SanitizedMessage {
   role: ChatRole
   content: string
 }
 
 interface BuildContextOptions {
-  supabase: SupabaseClient<Database>
+  supabase: ServerSupabaseClient
   chatId: string
   sanitizedMessages: SanitizedMessage[]
   baseSystemPrompt: string
@@ -39,7 +42,7 @@ interface BuildContextResult {
 }
 
 interface UpdateSummariesOptions {
-  supabase: SupabaseClient<Database>
+  supabase: ServerSupabaseClient
   chatId: string
   model: LanguageModel
 }
@@ -97,7 +100,7 @@ export async function buildContext({
 
   const { data: summaries, error: summaryError } = await supabase
     .from('chat_summaries')
-    .select('level, start_seq, end_seq, summary')
+    .select<'level, start_seq, end_seq, summary'>('level, start_seq, end_seq, summary')
     .eq('chat_id', chatId)
     .lte('start_seq', outsideCutoff)
     .order('level', { ascending: false })
@@ -111,10 +114,10 @@ export async function buildContext({
     }
   }
 
+  const summaryRows = (summaries ?? []) as SummaryRow[]
+
   const summarySegments =
-    summaries?.length && summaries.length > 0
-      ? formatSummarySegments(summaries)
-      : []
+    summaryRows.length > 0 ? formatSummarySegments(summaryRows) : []
 
   if (summarySegments.length === 0) {
     return {
@@ -170,7 +173,7 @@ export async function updateSummaries({
 }
 
 async function getMessageCount(
-  supabase: SupabaseClient<Database>,
+  supabase: ServerSupabaseClient,
   chatId: string
 ): Promise<number | null> {
   const { count, error } = await supabase
@@ -187,7 +190,7 @@ async function getMessageCount(
 }
 
 async function getLastSummaryEnd(
-  supabase: SupabaseClient<Database>,
+  supabase: ServerSupabaseClient,
   chatId: string,
   level: number
 ): Promise<number | null> {
@@ -198,7 +201,7 @@ async function getLastSummaryEnd(
     .eq('level', level)
     .order('end_seq', { ascending: false })
     .limit(1)
-    .maybeSingle()
+    .maybeSingle<{ end_seq: number }>()
 
   if (error) {
     if (error.code !== 'PGRST116') {
@@ -207,7 +210,7 @@ async function getLastSummaryEnd(
     return null
   }
 
-  return data?.end_seq ?? null
+  return data ? data.end_seq : null
 }
 
 async function processChunkSummaries({
@@ -217,7 +220,7 @@ async function processChunkSummaries({
   totalMessages,
   previousEnd,
 }: {
-  supabase: SupabaseClient<Database>
+  supabase: ServerSupabaseClient
   chatId: string
   model: LanguageModel
   totalMessages: number
@@ -266,7 +269,7 @@ async function createChunkSummary({
   startSeq,
   endSeq,
 }: {
-  supabase: SupabaseClient<Database>
+  supabase: ServerSupabaseClient
   chatId: string
   model: LanguageModel
   startSeq: number
@@ -277,7 +280,7 @@ async function createChunkSummary({
 
   const { data: messages, error: messageError } = await supabase
     .from('messages')
-    .select('role, content')
+    .select<'role, content'>('role, content')
     .eq('chat_id', chatId)
     .order('sequence', { ascending: true })
     .range(fromIndex, toIndex)
@@ -286,13 +289,15 @@ async function createChunkSummary({
     throw new Error(`Failed to load chunk messages: ${messageError.message}`)
   }
 
-  if (!messages || messages.length !== CHUNK_SIZE) {
+  const chunkMessages = (messages ?? []) as MessageTranscriptRow[]
+
+  if (chunkMessages.length !== CHUNK_SIZE) {
     throw new Error(
-      `Expected ${CHUNK_SIZE} messages for chunk but received ${messages?.length ?? 0}`
+      `Expected ${CHUNK_SIZE} messages for chunk but received ${chunkMessages.length}`
     )
   }
 
-  const formattedTranscript = messages
+  const formattedTranscript = chunkMessages
     .map((msg) => `${msg.role.toUpperCase()}: ${msg.content}`)
     .join('\n')
 
@@ -303,14 +308,16 @@ async function createChunkSummary({
     maxTokens: 160,
   })
 
-  await supabase.from('chat_summaries').insert({
-    chat_id: chatId,
-    level: SUMMARY_LEVEL_CHUNK,
-    start_seq: startSeq,
-    end_seq: endSeq,
-    summary: text.trim(),
-    token_count: usage?.completionTokens ?? null,
-  })
+  await supabase
+    .from('chat_summaries')
+    .insert<ChatSummaryInsert>({
+      chat_id: chatId,
+      level: SUMMARY_LEVEL_CHUNK,
+      start_seq: startSeq,
+      end_seq: endSeq,
+      summary: text.trim(),
+      token_count: usage?.completionTokens ?? null,
+    })
 }
 
 async function processMetaSummaries({
@@ -318,7 +325,7 @@ async function processMetaSummaries({
   chatId,
   model,
 }: {
-  supabase: SupabaseClient<Database>
+  supabase: ServerSupabaseClient
   chatId: string
   model: LanguageModel
 }) {
@@ -328,7 +335,7 @@ async function processMetaSummaries({
   while (true) {
     const { data: candidateChunks, error: chunkError } = await supabase
       .from('chat_summaries')
-      .select('id, start_seq, end_seq, summary')
+      .select<'id, start_seq, end_seq, summary'>('id, start_seq, end_seq, summary')
       .eq('chat_id', chatId)
       .eq('level', SUMMARY_LEVEL_CHUNK)
       .gt('start_seq', lastMetaEnd)
@@ -340,24 +347,26 @@ async function processMetaSummaries({
       return
     }
 
-    if (!candidateChunks || candidateChunks.length < SUMMARY_GROUP_SIZE) {
+    const chunkRows = (candidateChunks ?? []) as ChunkSummaryRow[]
+
+    if (chunkRows.length < SUMMARY_GROUP_SIZE) {
       return
     }
 
-    if (!areChunksSequential(candidateChunks)) {
+    if (!areChunksSequential(chunkRows)) {
       console.warn('Chunk summaries are not sequential; skipping meta summary generation')
       return
     }
 
-    const metaStart = candidateChunks[0].start_seq
-    const metaEnd = candidateChunks[candidateChunks.length - 1].end_seq
+    const metaStart = chunkRows[0].start_seq
+    const metaEnd = chunkRows[chunkRows.length - 1].end_seq
 
     try {
       await createMetaSummary({
         supabase,
         chatId,
         model,
-        chunks: candidateChunks,
+        chunks: chunkRows,
         startSeq: metaStart,
         endSeq: metaEnd,
       })
@@ -398,7 +407,7 @@ async function createMetaSummary({
   startSeq,
   endSeq,
 }: {
-  supabase: SupabaseClient<Database>
+  supabase: ServerSupabaseClient
   chatId: string
   model: LanguageModel
   chunks: Array<Pick<ChatSummary, 'start_seq' | 'end_seq' | 'summary'>>
@@ -419,14 +428,16 @@ async function createMetaSummary({
     maxTokens: 220,
   })
 
-  await supabase.from('chat_summaries').insert({
-    chat_id: chatId,
-    level: SUMMARY_LEVEL_META,
-    start_seq: startSeq,
-    end_seq: endSeq,
-    summary: text.trim(),
-    token_count: usage?.completionTokens ?? null,
-  })
+  await supabase
+    .from('chat_summaries')
+    .insert<ChatSummaryInsert>({
+      chat_id: chatId,
+      level: SUMMARY_LEVEL_META,
+      start_seq: startSeq,
+      end_seq: endSeq,
+      summary: text.trim(),
+      token_count: usage?.completionTokens ?? null,
+    })
 }
 
 export const SUMMARY_CONFIG = {
