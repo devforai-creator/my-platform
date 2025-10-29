@@ -31,6 +31,7 @@ export default function ChatInterface({
     preselectedApiKeyId || apiKeys[0]?.id || ''
   )
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [tokenStats, setTokenStats] = useState<TokenStats>(initialTokenStats)
 
   const selectedApiKey = apiKeys.find((k) => k.id === selectedApiKeyId)
 
@@ -46,6 +47,17 @@ export default function ChatInterface({
       chatId,
       provider: selectedApiKey?.provider,
       apiKeyId: selectedApiKeyId,
+    },
+    onFinish: (_message, { usage }) => {
+      if (!usage) {
+        return
+      }
+
+      setTokenStats((prev) => ({
+        total: prev.total + usage.totalTokens,
+        prompt: prev.prompt + usage.promptTokens,
+        completion: prev.completion + usage.completionTokens,
+      }))
     },
   })
 
@@ -81,12 +93,12 @@ export default function ChatInterface({
             <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <span className="text-gray-600 dark:text-gray-400">총 토큰:</span>
               <span className="font-semibold text-blue-600 dark:text-blue-400">
-                {initialTokenStats.total.toLocaleString()}
+                {tokenStats.total.toLocaleString()}
               </span>
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              (입력: {initialTokenStats.prompt.toLocaleString()} |
-              출력: {initialTokenStats.completion.toLocaleString()})
+              (입력: {tokenStats.prompt.toLocaleString()} | 출력:{' '}
+              {tokenStats.completion.toLocaleString()})
             </div>
           </div>
         </div>
