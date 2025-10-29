@@ -41,6 +41,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Migration
 - `supabase/migrations/03_chat_summaries.sql`: chat_summaries 테이블, RLS 정책, 인덱스
 
+### Fixed (디버깅 과정)
+- **Gemini MAX_TOKENS 초과 문제**:
+  - 초기 `maxTokens: 160/220` 설정이 긴 대화 요약에 부족
+  - 메시지 자르기 추가 (`MESSAGE_CHAR_LIMIT = 1200`)
+  - 최종 토큰 한도 대폭 증가 (`CHUNK: 2048`, `META: 3072`)
+- **Fallback 메커니즘**: LLM 요약 실패 시 간단한 하이라이트 저장
+- **청크 스케줄링**: 20/30/40개 시점에 정확히 [1-10], [11-20], [21-30] 요약 생성 확인
+- **초기 테스트 성공**: 실제 채팅에서 요약 생성 확인 (2025-10-29)
+
+### Notes
+- 디버깅 로그 (`[summaries]`) 현재 활성화 상태 (추후 안정화 후 제거 예정)
+- Layer 1 핵심 기능 완성, 실전 검증 진행 중
+- 100개 메시지 도달 시 메타 요약 생성 예정
+
 ---
 
 ## [0.1.2] - 2025-10-29
