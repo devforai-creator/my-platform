@@ -1,8 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
-import { streamText } from 'ai'
+import { streamText, type LanguageModel } from 'ai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createAnthropic } from '@ai-sdk/anthropic'
+import {
+  buildContext,
+  updateSummaries,
+  type SanitizedMessage,
+} from '@/lib/chat-summaries'
 
 export const runtime = 'edge'
 export const maxDuration = 60 // 60초 타임아웃
@@ -29,7 +34,7 @@ export async function POST(req: Request) {
       return new Response('Invalid apiKeyId', { status: 400 })
     }
 
-    const sanitizedMessages = Array.isArray(messages)
+    const sanitizedMessages: SanitizedMessage[] = Array.isArray(messages)
       ? messages
           .filter(
             (message): message is { role: string; content: string } =>
@@ -38,11 +43,11 @@ export async function POST(req: Request) {
               typeof message.role === 'string' &&
               typeof message.content === 'string'
           )
+          .filter((message) => message.role === 'user' || message.role === 'assistant')
           .map((message) => ({
-            role: message.role as 'user' | 'assistant' | 'system',
+            role: message.role as 'user' | 'assistant',
             content: message.content,
           }))
-          .filter((message) => message.role === 'user' || message.role === 'assistant')
       : []
 
     if (sanitizedMessages.length === 0) {
@@ -113,10 +118,8 @@ export async function POST(req: Request) {
       return new Response('Character not found', { status: 404 })
     }
 
-    const maxContextMessages = chat.max_context_messages || 20
-
     // Provider에 따라 모델 선택
-    let model
+    let model: LanguageModel
     const provider = apiKeyData.provider
     const modelName = apiKeyData.model_preference || getDefaultModel(provider)
 
@@ -140,19 +143,18 @@ export async function POST(req: Request) {
         return new Response('Unsupported provider', { status: 400 })
     }
 
-    // 시스템 프롬프트 추가
-    const systemMessage = {
-      role: 'system' as const,
-      content: character.system_prompt,
-    }
-
-    // FIFO 컨텍스트 윈도우: 최근 N개 메시지만 사용
-    const recentMessages = sanitizedMessages.slice(-maxContextMessages)
+    const { systemPrompt, recentMessages } = await buildContext({
+      supabase,
+      chatId: chat.id,
+      sanitizedMessages,
+      baseSystemPrompt: character.system_prompt,
+    })
 
     // 스트리밍 응답 생성
     const result = await streamText({
       model,
-      messages: [systemMessage, ...recentMessages],
+      system: systemPrompt,
+      messages: recentMessages,
       async onFinish({ text, usage }) {
         // 응답이 완료되면 메시지 저장
         try {
@@ -184,6 +186,8 @@ export async function POST(req: Request) {
             .from('api_keys')
             .update({ last_used_at: new Date().toISOString() })
             .eq('id', apiKeyId)
+
+          await updateSummaries({ supabase, chatId, model })
         } catch (error) {
           console.error('Error saving messages:', error)
         }

@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2025-10-29
+
+### Added
+
+#### 계층적 장기기억 시스템 (Layer 1)
+- **Pre-emptive 청크 요약**: 20번째 메시지마다 지난 10개 메시지를 자동 요약
+  - Context gap 문제 해결 (messages 21-29에서 1-9번 메시지 접근 가능)
+  - FIFO 윈도우가 꽉 찬 시점에 미리 요약 생성
+- **계층적 재요약 (Meta-summarization)**:
+  - 10개 청크(100 메시지)가 모이면 메타 요약 자동 생성
+  - Level 0: 청크 요약 (10 메시지)
+  - Level 1: 메타 요약 (100 메시지)
+  - Level 2: 슈퍼 메타 요약 (1000 메시지, 향후 확장)
+- **컨텍스트 빌더**: 요약 + 최근 20개 메시지를 intelligent하게 조합
+- **새 데이터베이스 테이블**: `chat_summaries` (RLS 적용, 인덱싱 최적화)
+
+#### 테스트 인프라
+- Vitest 테스트 프레임워크 추가
+- `src/lib/chat-summaries.test.ts`: 요약 포맷팅, 청크 스케줄링, 컨텍스트 조립 unit tests
+- `npm test` 스크립트 추가
+
+### Changed
+- `/api/chat` 엔드포인트: 메시지 전송 후 자동으로 요약 생성 트리거
+- Supabase 클라이언트: Typed RPC 함수 노출 (`src/lib/supabase/server.ts`, `src/lib/supabase/client.ts`)
+- 타입 정의: `chat_summaries` 테이블 타입 추가 (`src/types/database.types.ts`)
+
+### Technical Details
+- **Pre-emptive 타이밍**: Message 20, 30, 40... (FIFO가 꽉 찬 시점)
+- **청크 크기**: 10 메시지
+- **FIFO 윈도우**: 20 메시지 (변경 없음)
+- **요약 알고리즘**: LLM 기반 (Google Gemini / OpenAI / Anthropic)
+- **데이터베이스**: PostgreSQL, RLS로 사용자 격리
+
+### Migration
+- `supabase/migrations/03_chat_summaries.sql`: chat_summaries 테이블, RLS 정책, 인덱스
+
+---
+
 ## [0.1.2] - 2025-10-29
 
 ### Security

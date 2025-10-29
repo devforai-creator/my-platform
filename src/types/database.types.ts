@@ -200,6 +200,38 @@ export interface Database {
           created_at?: string
         }
       }
+      chat_summaries: {
+        Row: {
+          id: string
+          chat_id: string
+          level: number
+          start_seq: number
+          end_seq: number
+          summary: string
+          token_count: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          chat_id: string
+          level: number
+          start_seq: number
+          end_seq: number
+          summary: string
+          token_count?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          chat_id?: string
+          level?: number
+          start_seq?: number
+          end_seq?: number
+          summary?: string
+          token_count?: number | null
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -233,6 +265,10 @@ export type ChatUpdate = Database['public']['Tables']['chats']['Update']
 export type Message = Database['public']['Tables']['messages']['Row']
 export type MessageInsert = Database['public']['Tables']['messages']['Insert']
 export type MessageUpdate = Database['public']['Tables']['messages']['Update']
+
+export type ChatSummary = Database['public']['Tables']['chat_summaries']['Row']
+export type ChatSummaryInsert = Database['public']['Tables']['chat_summaries']['Insert']
+export type ChatSummaryUpdate = Database['public']['Tables']['chat_summaries']['Update']
 
 // Extended types with relations
 export type CharacterWithOwner = Character & {
