@@ -62,9 +62,11 @@ describe('formatSummarySegments', () => {
 describe('calculateChunkBoundaries', () => {
   const { CONTEXT_WINDOW, CHUNK_SIZE } = SUMMARY_CONFIG
 
-  it('returns empty when not enough backlog beyond context window', () => {
-    const totalMessages = CONTEXT_WINDOW + CHUNK_SIZE - 1
-    expect(calculateChunkBoundaries(totalMessages, 0)).toEqual([])
+  it('emits first chunk once total messages reach the trigger point', () => {
+    const totalMessages = CONTEXT_WINDOW
+    expect(calculateChunkBoundaries(totalMessages, 0)).toEqual([
+      { start: 1, end: 10 },
+    ])
   })
 
   it('returns sequential chunk ranges up to the cut-off', () => {
@@ -72,6 +74,7 @@ describe('calculateChunkBoundaries', () => {
     expect(calculateChunkBoundaries(totalMessages, 0)).toEqual([
       { start: 1, end: 10 },
       { start: 11, end: 20 },
+      { start: 21, end: 30 },
     ])
   })
 
@@ -79,6 +82,21 @@ describe('calculateChunkBoundaries', () => {
     const totalMessages = CONTEXT_WINDOW + CHUNK_SIZE * 3
     expect(calculateChunkBoundaries(totalMessages, 20)).toEqual([
       { start: 21, end: 30 },
+      { start: 31, end: 40 },
+    ])
+  })
+
+  it('does not emit new chunks if we are between triggers', () => {
+    const totalMessages = CONTEXT_WINDOW + CHUNK_SIZE - 1
+    expect(calculateChunkBoundaries(totalMessages, CHUNK_SIZE)).toEqual([])
+    expect(calculateChunkBoundaries(totalMessages, CHUNK_SIZE * 2)).toEqual([])
+  })
+
+  it('skips chunks already summarized', () => {
+    const totalMessages = CONTEXT_WINDOW + CHUNK_SIZE * 4
+    expect(calculateChunkBoundaries(totalMessages, 30)).toEqual([
+      { start: 31, end: 40 },
+      { start: 41, end: 50 },
     ])
   })
 })

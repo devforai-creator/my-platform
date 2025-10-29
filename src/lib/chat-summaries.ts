@@ -59,22 +59,22 @@ export function formatSummarySegments(
 export function calculateChunkBoundaries(
   totalMessages: number,
   previousEnd: number,
-  contextWindow: number = CONTEXT_WINDOW,
   chunkSize: number = CHUNK_SIZE
 ): Array<{ start: number; end: number }> {
-  const targetEnd = totalMessages - contextWindow
+  const latestChunkEnd = totalMessages - chunkSize
 
-  if (targetEnd - previousEnd < chunkSize) {
+  if (latestChunkEnd < chunkSize || latestChunkEnd <= previousEnd) {
     return []
   }
 
   const boundaries: Array<{ start: number; end: number }> = []
-  let nextChunkStart = previousEnd + 1
+  let nextChunkEnd = Math.max(previousEnd + chunkSize, chunkSize)
 
-  while (targetEnd - nextChunkStart + 1 >= chunkSize) {
-    const chunkEnd = nextChunkStart + chunkSize - 1
-    boundaries.push({ start: nextChunkStart, end: chunkEnd })
-    nextChunkStart = chunkEnd + 1
+  while (nextChunkEnd <= latestChunkEnd) {
+    const start = nextChunkEnd - chunkSize + 1
+    const end = nextChunkEnd
+    boundaries.push({ start, end })
+    nextChunkEnd += chunkSize
   }
 
   return boundaries
@@ -144,7 +144,7 @@ export async function updateSummaries({
   try {
     const totalMessages = await getMessageCount(supabase, chatId)
 
-    if (totalMessages === null || totalMessages <= CONTEXT_WINDOW) {
+    if (totalMessages === null || totalMessages < CHUNK_SIZE * 2) {
       return
     }
 
@@ -229,7 +229,6 @@ async function processChunkSummaries({
   const boundaries = calculateChunkBoundaries(
     totalMessages,
     previousEnd,
-    CONTEXT_WINDOW,
     CHUNK_SIZE
   )
 
