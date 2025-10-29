@@ -33,6 +33,7 @@ export default function ChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [tokenStats, setTokenStats] = useState<TokenStats>(initialTokenStats)
   const [errorBanner, setErrorBanner] = useState<string | null>(null)
+  const censorPollCancelRef = useRef<(() => void) | null>(null)
 
   const selectedApiKey = apiKeys.find((k) => k.id === selectedApiKeyId)
 
@@ -67,34 +68,78 @@ export default function ChatInterface({
 
       // 빈 에러 메시지일 경우 (검열로 인한 빈 응답)
       if (!messageText) {
-        // 1.5초 후 서버에서 시스템 메시지 확인
-        setTimeout(async () => {
-          try {
-            const response = await fetch(`/api/chats/${chatId}/messages/latest`)
+        if (censorPollCancelRef.current) {
+          censorPollCancelRef.current()
+          censorPollCancelRef.current = null
+        }
 
-            if (!response.ok) {
+        let cancelled = false
+        const cancelPolling = () => {
+          cancelled = true
+        }
+        censorPollCancelRef.current = cancelPolling
+
+        const pollDelays = [600, 1200, 2000]
+
+        void (async () => {
+          for (const delay of pollDelays) {
+            await new Promise((resolve) => setTimeout(resolve, delay))
+
+            if (cancelled) {
               return
             }
 
-            const latestMessage = await response.json()
+            try {
+              const response = await fetch(`/api/chats/${chatId}/messages/latest`, {
+                cache: 'no-store',
+              })
 
-            // 시스템 메시지가 있으면 추가
-            if (latestMessage?.role === 'system') {
-              setErrorBanner(latestMessage.content)
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: latestMessage.id,
-                  role: 'system',
-                  content: latestMessage.content,
-                  createdAt: new Date(latestMessage.created_at),
-                },
-              ])
+              if (!response.ok) {
+                continue
+              }
+
+              const latestMessage = await response.json()
+
+              if (
+                latestMessage &&
+                latestMessage.role === 'system' &&
+                typeof latestMessage.content === 'string'
+              ) {
+                if (cancelled) {
+                  return
+                }
+
+                setErrorBanner(latestMessage.content)
+                setMessages((prev) => {
+                  if (prev.some((message) => message.id === latestMessage.id)) {
+                    return prev
+                  }
+
+                  return [
+                    ...prev,
+                    {
+                      id: latestMessage.id ?? `system-${Date.now()}`,
+                      role: 'system',
+                      content: latestMessage.content,
+                      createdAt: latestMessage.created_at
+                        ? new Date(latestMessage.created_at)
+                        : new Date(),
+                    },
+                  ]
+                })
+
+                cancelPolling()
+                censorPollCancelRef.current = null
+                return
+              }
+            } catch (pollError) {
+              console.error('Error polling latest system message:', pollError)
             }
-          } catch (error) {
-            console.error('Error fetching latest message:', error)
           }
-        }, 1500)
+
+          censorPollCancelRef.current = null
+        })()
+
         return
       }
 
@@ -121,6 +166,15 @@ export default function ChatInterface({
       setErrorBanner(error.message)
     }
   }, [error])
+
+  useEffect(() => {
+    return () => {
+      if (censorPollCancelRef.current) {
+        censorPollCancelRef.current()
+        censorPollCancelRef.current = null
+      }
+    }
+  }, [])
 
   const handleFormSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {

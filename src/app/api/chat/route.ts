@@ -126,7 +126,19 @@ export async function POST(req: Request) {
     switch (provider) {
       case 'google': {
         const googleProvider = createGoogleGenerativeAI({ apiKey: decryptedApiKey })
-        const safetySettings = [
+        const safetySettings: Array<{
+          category:
+            | 'HARM_CATEGORY_HARASSMENT'
+            | 'HARM_CATEGORY_HATE_SPEECH'
+            | 'HARM_CATEGORY_SEXUALLY_EXPLICIT'
+            | 'HARM_CATEGORY_DANGEROUS_CONTENT'
+          threshold:
+            | 'HARM_BLOCK_THRESHOLD_UNSPECIFIED'
+            | 'BLOCK_LOW_AND_ABOVE'
+            | 'BLOCK_MEDIUM_AND_ABOVE'
+            | 'BLOCK_ONLY_HIGH'
+            | 'BLOCK_NONE'
+        }> = [
           {
             category: 'HARM_CATEGORY_HARASSMENT',
             threshold: 'BLOCK_NONE',
@@ -143,7 +155,7 @@ export async function POST(req: Request) {
             category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
             threshold: 'BLOCK_NONE',
           },
-        ] as const
+        ]
 
         model = googleProvider(modelName, { safetySettings })
         break
