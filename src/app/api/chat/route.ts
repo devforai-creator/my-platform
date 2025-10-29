@@ -126,7 +126,26 @@ export async function POST(req: Request) {
     switch (provider) {
       case 'google': {
         const googleProvider = createGoogleGenerativeAI({ apiKey: decryptedApiKey })
-        model = googleProvider(modelName)
+        model = googleProvider(modelName, {
+          safetySettings: [
+            {
+              category: 'HARM_CATEGORY_HARASSMENT',
+              threshold: 'BLOCK_NONE',
+            },
+            {
+              category: 'HARM_CATEGORY_HATE_SPEECH',
+              threshold: 'BLOCK_NONE',
+            },
+            {
+              category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+              threshold: 'BLOCK_NONE',
+            },
+            {
+              category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+              threshold: 'BLOCK_NONE',
+            },
+          ],
+        })
         break
       }
       case 'openai': {
