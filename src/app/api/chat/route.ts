@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { streamText, type LanguageModel } from 'ai'
+import { streamText, type FinishReason, type LanguageModel } from 'ai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createAnthropic } from '@ai-sdk/anthropic'
@@ -126,26 +126,26 @@ export async function POST(req: Request) {
     switch (provider) {
       case 'google': {
         const googleProvider = createGoogleGenerativeAI({ apiKey: decryptedApiKey })
-        model = googleProvider(modelName, {
-          safetySettings: [
-            {
-              category: 'HARM_CATEGORY_HARASSMENT',
-              threshold: 'BLOCK_NONE',
-            },
-            {
-              category: 'HARM_CATEGORY_HATE_SPEECH',
-              threshold: 'BLOCK_NONE',
-            },
-            {
-              category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-              threshold: 'BLOCK_NONE',
-            },
-            {
-              category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-              threshold: 'BLOCK_NONE',
-            },
-          ],
-        })
+        const safetySettings = [
+          {
+            category: 'HARM_CATEGORY_HARASSMENT',
+            threshold: 'BLOCK_NONE',
+          },
+          {
+            category: 'HARM_CATEGORY_HATE_SPEECH',
+            threshold: 'BLOCK_NONE',
+          },
+          {
+            category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+            threshold: 'BLOCK_NONE',
+          },
+          {
+            category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+            threshold: 'BLOCK_NONE',
+          },
+        ] as const
+
+        model = googleProvider(modelName, { safetySettings })
         break
       }
       case 'openai': {
@@ -169,12 +169,19 @@ export async function POST(req: Request) {
       baseSystemPrompt: character.system_prompt,
     })
 
+    let contentFilterError: string | null = null
+
     // 스트리밍 응답 생성
     const result = await streamText({
       model,
       system: systemPrompt,
       messages: recentMessages,
-      async onFinish({ text, usage }) {
+      async onFinish({
+        text,
+        usage,
+        finishReason,
+        experimental_providerMetadata,
+      }) {
         // 응답이 완료되면 메시지 저장
         try {
           // 사용자 메시지 저장
@@ -190,20 +197,65 @@ export async function POST(req: Request) {
             content: userMessage.content,
           })
 
+          const contentFilterInfo = evaluateContentFilter({
+            provider,
+            finishReason,
+            metadata: experimental_providerMetadata,
+          })
+
+          const nowIsoString = new Date().toISOString()
+
+          const isEmptyAssistantReply =
+            typeof text !== 'string' || text.trim().length === 0
+
+          if (provider === 'google' && (finishReason !== 'stop' || isEmptyAssistantReply)) {
+            console.warn('[Chat API] Google finish details', {
+              finishReason,
+              textLength: typeof text === 'string' ? text.length : null,
+              metadata: experimental_providerMetadata,
+            })
+          }
+
+          const shouldTreatAsFiltered =
+            contentFilterInfo.blocked || (provider === 'google' && isEmptyAssistantReply)
+
+          if (shouldTreatAsFiltered) {
+            const errorMessage = buildContentFilterMessage(
+              provider,
+              contentFilterInfo.categories
+            )
+            contentFilterError = errorMessage
+
+            await supabase.from('messages').insert({
+              chat_id: chatId,
+              role: 'system',
+              content: errorMessage,
+              error_code:
+                provider === 'google' ? 'GOOGLE_CONTENT_FILTER' : 'CONTENT_FILTER',
+            })
+
+            await supabase
+              .from('api_keys')
+              .update({ last_used_at: nowIsoString })
+              .eq('id', apiKeyId)
+
+            return
+          }
+
           // AI 응답 저장
           await supabase.from('messages').insert({
             chat_id: chatId,
             role: 'assistant',
             content: text,
             model_used: modelName,
-            prompt_tokens: usage?.promptTokens,
-            completion_tokens: usage?.completionTokens,
+            prompt_tokens: usage?.promptTokens ?? null,
+            completion_tokens: usage?.completionTokens ?? null,
           })
 
           // API 키 마지막 사용 시간 업데이트
           await supabase
             .from('api_keys')
-            .update({ last_used_at: new Date().toISOString() })
+            .update({ last_used_at: nowIsoString })
             .eq('id', apiKeyId)
 
           await updateSummaries({ supabase, chatId, model })
@@ -212,6 +264,13 @@ export async function POST(req: Request) {
         }
       },
     })
+
+    if (contentFilterError) {
+      return new Response(JSON.stringify({ error: contentFilterError }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
 
     return result.toAIStreamResponse()
   } catch (error) {
@@ -231,4 +290,87 @@ function getDefaultModel(provider: string): string {
     default:
       return 'gemini-2.5-flash'
   }
+}
+
+function evaluateContentFilter({
+  provider,
+  finishReason,
+  metadata,
+}: {
+  provider: string
+  finishReason: FinishReason | undefined
+  metadata: unknown
+}): { blocked: boolean; categories: string[] } {
+  const normalizedFinish = typeof finishReason === 'string' ? finishReason : 'unknown'
+  let blocked = normalizedFinish === 'content-filter'
+  let categories: string[] = []
+
+  if (provider !== 'google') {
+    return { blocked, categories }
+  }
+
+  const googleMetadata =
+    metadata && typeof metadata === 'object' && metadata !== null && 'google' in metadata
+      ? (metadata as { google?: Record<string, unknown> }).google ?? {}
+      : {}
+
+  const finishReasonHint =
+    typeof googleMetadata?.finishReason === 'string'
+      ? googleMetadata.finishReason.toLowerCase()
+      : null
+
+  const safetyRatingsRaw =
+    googleMetadata && 'safetyRatings' in googleMetadata
+      ? (googleMetadata.safetyRatings as unknown)
+      : undefined
+
+  const safetyRatings = Array.isArray(safetyRatingsRaw) ? safetyRatingsRaw : []
+
+  const blockedRatings = safetyRatings
+    .map((entry) => (typeof entry === 'object' && entry !== null ? entry : null))
+    .filter(
+      (entry): entry is { category?: unknown; blocked?: unknown } =>
+        entry !== null && 'blocked' in entry
+    )
+    .filter((entry) => Boolean(entry.blocked))
+
+  categories = blockedRatings
+    .map((entry) => entry.category)
+    .filter((category): category is string => typeof category === 'string')
+
+  if (blockedRatings.length > 0) {
+    blocked = true
+  }
+
+  if (
+    finishReasonHint === 'safety' ||
+    finishReasonHint === 'blocked' ||
+    normalizedFinish === 'other'
+  ) {
+    blocked = true
+  }
+
+  return { blocked, categories }
+}
+
+function buildContentFilterMessage(provider: string, categories: string[]): string {
+  const baseMessage =
+    provider === 'google'
+      ? 'Google Gemini 검열에 의해 차단되었습니다. 프롬프트를 완화하거나 다른 API 키/모델을 사용해주세요.'
+      : '모델의 안전 필터에 의해 응답이 차단되었습니다. 프롬프트를 조정하거나 다른 모델을 사용해주세요.'
+
+  if (categories.length === 0) {
+    return baseMessage
+  }
+
+  const formattedCategories = categories
+    .map((category) =>
+      category
+        .replace(/^HARM_CATEGORY_/, '')
+        .replace(/_/g, ' ')
+        .toLowerCase()
+    )
+    .join(', ')
+
+  return `${baseMessage}\n감지된 카테고리: ${formattedCategories}`
 }

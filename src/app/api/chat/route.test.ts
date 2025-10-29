@@ -108,11 +108,12 @@ interface CharacterRow {
 
 interface MessageInsertRow {
   chat_id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: string
   model_used?: string | null
   prompt_tokens?: number | null
   completion_tokens?: number | null
+  error_code?: string | null
 }
 
 interface SupabaseFixture {
@@ -270,6 +271,7 @@ class MessagesTable {
         model_used: record.model_used ?? null,
         prompt_tokens: record.prompt_tokens ?? null,
         completion_tokens: record.completion_tokens ?? null,
+        error_code: record.error_code ?? null,
       })
     })
     return { data: records, error: null }
@@ -299,6 +301,8 @@ describe('POST /api/chat', () => {
         await onFinish({
           text: 'assistant reply',
           usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
+          finishReason: 'stop',
+          experimental_providerMetadata: undefined,
         })
       }
       return {
@@ -433,5 +437,167 @@ describe('POST /api/chat', () => {
         chatId: 'chat-1',
       })
     )
+  })
+
+  it('returns a descriptive error when the provider blocks the response', async () => {
+    const supabase = createSupabaseMock({
+      user: { id: 'user-1' },
+      apiKeys: [
+        {
+          id: 'api-key-1',
+          user_id: 'user-1',
+          provider: 'google',
+          is_active: true,
+          vault_secret_name: 'secret-key',
+          model_preference: 'gemini-2.5-flash',
+        },
+      ],
+      chats: [
+        {
+          id: 'chat-1',
+          user_id: 'user-1',
+          character_id: 'character-1',
+          max_context_messages: 20,
+        },
+      ],
+      characters: [
+        {
+          id: 'character-1',
+          system_prompt: 'character system prompt',
+        },
+      ],
+    })
+
+    streamTextMock.mockImplementationOnce(async ({ onFinish }) => {
+      if (onFinish) {
+        await onFinish({
+          text: '',
+          usage: undefined,
+          finishReason: 'content-filter',
+          experimental_providerMetadata: {
+            google: {
+              safetyRatings: [
+                {
+                  category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+                  blocked: true,
+                },
+              ],
+            },
+          },
+        })
+      }
+      return {
+        toAIStreamResponse() {
+          return new Response('unexpected stream', { status: 200 })
+        },
+      }
+    })
+
+    createClientMock.mockResolvedValueOnce(supabase)
+
+    const request = new Request('http://localhost/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        chatId: 'chat-1',
+        apiKeyId: 'api-key-1',
+        messages: [{ role: 'user', content: '금지된 프롬프트' }],
+      }),
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(409)
+    const body = await response.text()
+    expect(body).toContain('Google Gemini 검열에 의해 차단되었습니다')
+    expect(body).toContain('dangerous content')
+
+    expect(supabase.messages).toHaveLength(2)
+    expect(supabase.messages[0]).toMatchObject({
+      role: 'user',
+      content: '금지된 프롬프트',
+      error_code: null,
+    })
+    expect(supabase.messages[1]).toMatchObject({
+      role: 'system',
+      error_code: 'GOOGLE_CONTENT_FILTER',
+    })
+
+    expect(updateSummariesMock).not.toHaveBeenCalled()
+  })
+
+  it('treats empty Google responses as filtered output', async () => {
+    const supabase = createSupabaseMock({
+      user: { id: 'user-1' },
+      apiKeys: [
+        {
+          id: 'api-key-1',
+          user_id: 'user-1',
+          provider: 'google',
+          is_active: true,
+          vault_secret_name: 'secret-key',
+          model_preference: 'gemini-2.5-flash',
+        },
+      ],
+      chats: [
+        {
+          id: 'chat-1',
+          user_id: 'user-1',
+          character_id: 'character-1',
+          max_context_messages: 20,
+        },
+      ],
+      characters: [
+        {
+          id: 'character-1',
+          system_prompt: 'system prompt',
+        },
+      ],
+    })
+
+    streamTextMock.mockImplementationOnce(async ({ onFinish }) => {
+      if (onFinish) {
+        await onFinish({
+          text: '',
+          usage: undefined,
+          finishReason: 'unknown',
+          experimental_providerMetadata: undefined,
+        })
+      }
+      return {
+        toAIStreamResponse() {
+          return new Response('unexpected stream', { status: 200 })
+        },
+      }
+    })
+
+    createClientMock.mockResolvedValueOnce(supabase)
+
+    const request = new Request('http://localhost/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        chatId: 'chat-1',
+        apiKeyId: 'api-key-1',
+        messages: [{ role: 'user', content: '무응답 테스트' }],
+      }),
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(409)
+    const body = await response.text()
+    expect(body).toContain('Google Gemini 검열에 의해 차단되었습니다')
+
+    expect(supabase.messages).toHaveLength(2)
+    expect(supabase.messages[0]).toMatchObject({
+      role: 'user',
+      content: '무응답 테스트',
+      error_code: null,
+    })
+    expect(supabase.messages[1]).toMatchObject({
+      role: 'system',
+      error_code: 'GOOGLE_CONTENT_FILTER',
+    })
+
+    expect(updateSummariesMock).not.toHaveBeenCalled()
   })
 })

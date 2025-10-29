@@ -1,7 +1,7 @@
 'use client'
 
 import { useChat } from 'ai/react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import type { Message, ApiKey } from '@/types/database.types'
 
 interface TokenStats {
@@ -32,15 +32,27 @@ export default function ChatInterface({
   )
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [tokenStats, setTokenStats] = useState<TokenStats>(initialTokenStats)
+  const [errorBanner, setErrorBanner] = useState<string | null>(null)
 
   const selectedApiKey = apiKeys.find((k) => k.id === selectedApiKeyId)
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+  const {
+    messages,
+    setMessages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+    error,
+  } = useChat({
     api: '/api/chat',
     id: chatId,
     initialMessages: initialMessages.map((m) => ({
       id: m.id,
-      role: m.role as 'user' | 'assistant',
+      role:
+        m.role === 'user' || m.role === 'assistant' || m.role === 'system'
+          ? m.role
+          : 'assistant',
       content: m.content,
     })),
     body: {
@@ -48,23 +60,77 @@ export default function ChatInterface({
       provider: selectedApiKey?.provider,
       apiKeyId: selectedApiKeyId,
     },
-    onFinish: (_message, { usage }) => {
-      if (!usage) {
+    keepLastMessageOnError: true,
+    onError: (err) => {
+      const messageText =
+        err instanceof Error ? err.message : typeof err === 'string' ? err : null
+
+      // 빈 에러 메시지일 경우 (검열로 인한 빈 응답)
+      if (!messageText) {
+        // 1.5초 후 서버에서 시스템 메시지 확인
+        setTimeout(async () => {
+          try {
+            const response = await fetch(`/api/chats/${chatId}/messages/latest`)
+
+            if (!response.ok) {
+              return
+            }
+
+            const latestMessage = await response.json()
+
+            // 시스템 메시지가 있으면 추가
+            if (latestMessage?.role === 'system') {
+              setErrorBanner(latestMessage.content)
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: latestMessage.id,
+                  role: 'system',
+                  content: latestMessage.content,
+                  createdAt: new Date(latestMessage.created_at),
+                },
+              ])
+            }
+          } catch (error) {
+            console.error('Error fetching latest message:', error)
+          }
+        }, 1500)
         return
       }
 
-      setTokenStats((prev) => ({
-        total: prev.total + usage.totalTokens,
-        prompt: prev.prompt + usage.promptTokens,
-        completion: prev.completion + usage.completionTokens,
-      }))
+      setErrorBanner(messageText)
+    },
+    onFinish: (_message, { usage }) => {
+      if (usage) {
+        setTokenStats((prev) => ({
+          total: prev.total + usage.totalTokens,
+          prompt: prev.prompt + usage.promptTokens,
+          completion: prev.completion + usage.completionTokens,
+        }))
+      }
     },
   })
 
   // 자동 스크롤
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, errorBanner])
+
+  useEffect(() => {
+    if (error?.message) {
+      setErrorBanner(error.message)
+    }
+  }, [error])
+
+  const handleFormSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      if (errorBanner) {
+        setErrorBanner(null)
+      }
+      void handleSubmit(event)
+    },
+    [errorBanner, handleSubmit]
+  )
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -107,31 +173,51 @@ export default function ChatInterface({
       {/* 메시지 목록 */}
       <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
         <div className="max-w-4xl mx-auto p-4 space-y-4">
+          {errorBanner && (
+            <div className="bg-red-50 border border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-700 dark:text-red-200 rounded-lg px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="text-sm whitespace-pre-wrap break-words">
+                  {errorBanner}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setErrorBanner(null)}
+                  className="text-xs text-red-600 dark:text-red-300 hover:underline"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          )}
           {messages.length === 0 ? (
             <div className="text-center text-gray-500 dark:text-gray-400 mt-8">
               <p>대화를 시작해보세요!</p>
             </div>
           ) : (
-            messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
-                }`}
-              >
+            messages.map((message) => {
+              const isUser = message.role === 'user'
+              const isSystem = message.role === 'system'
+              const bubbleClasses = isUser
+                ? 'bg-blue-600 text-white'
+                : isSystem
+                  ? 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-200 dark:border-red-700'
+                  : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700'
+
+              return (
                 <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                    message.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700'
-                  }`}
+                  key={message.id}
+                  className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className="whitespace-pre-wrap break-words">
-                    {message.content}
+                  <div
+                    className={`max-w-[80%] rounded-lg px-4 py-2 ${bubbleClasses}`}
+                  >
+                    <div className="whitespace-pre-wrap break-words">
+                      {message.content}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
           {isLoading && (
             <div className="flex justify-start">
@@ -156,7 +242,7 @@ export default function ChatInterface({
 
       {/* 입력 폼 */}
       <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
-        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+        <form onSubmit={handleFormSubmit} className="max-w-4xl mx-auto">
           <div className="flex gap-2">
             <textarea
               value={input}
