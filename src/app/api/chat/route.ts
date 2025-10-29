@@ -187,7 +187,6 @@ export async function POST(req: Request) {
             .update({ last_used_at: new Date().toISOString() })
             .eq('id', apiKeyId)
 
-          console.log('[summaries] queue update', chatId)
           await updateSummaries({ supabase, chatId, model })
         } catch (error) {
           console.error('Error saving messages:', error)

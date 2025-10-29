@@ -149,8 +149,6 @@ export async function updateSummaries({
 }: UpdateSummariesOptions): Promise<void> {
   try {
     const totalMessages = await getMessageCount(supabase, chatId)
-    console.log('[summaries] total messages', totalMessages, 'for chat', chatId)
-
     if (totalMessages === null || totalMessages < CHUNK_SIZE * 2) {
       return
     }
@@ -311,8 +309,6 @@ async function createChunkSummary({
   const formattedTranscript = sanitizedChunk
     .map((msg) => `${msg.role.toUpperCase()}: ${msg.content}`)
     .join('\n')
-
-  console.log('[summaries] summarizing chunk', startSeq, endSeq, 'for chat', chatId)
 
   const { summaryText, tokenCount } = await generateSummaryWithFallback({
     model,
@@ -494,7 +490,9 @@ async function generateSummaryWithFallback({
       tokenCount: usage?.completionTokens ?? null,
     }
   } catch (error) {
-    console.error(`[summaries] LLM summary failed (${fallbackLabel})`, error)
+    const message =
+      error instanceof Error ? error.message : 'Unknown error during summarization'
+    console.error(`[summaries] LLM summary failed (${fallbackLabel}) - ${message}`)
     const fallbackText = fallbackTextFactory()
     return {
       summaryText: fallbackText,
