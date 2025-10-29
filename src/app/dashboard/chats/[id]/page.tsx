@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import ChatInterface from './ChatInterface'
+import ChatSummariesPanel from './ChatSummariesPanel'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -47,6 +48,15 @@ export default async function ChatPage({ params, searchParams }: Props) {
     .select('*')
     .eq('chat_id', id)
     .order('created_at', { ascending: true })
+
+  const totalMessagesCount = messages?.length ?? 0
+
+  const { data: summaries } = await supabase
+    .from('chat_summaries')
+    .select('id, level, start_seq, end_seq, summary, created_at')
+    .eq('chat_id', id)
+    .order('level', { ascending: false })
+    .order('start_seq', { ascending: true })
 
   // 토큰 사용량 계산
   const totalTokens = messages?.reduce((sum, msg) => {
@@ -97,17 +107,27 @@ export default async function ChatPage({ params, searchParams }: Props) {
       </header>
 
       {/* 채팅 인터페이스 */}
-      <ChatInterface
-        chatId={chat.id}
-        initialMessages={messages || []}
-        apiKeys={apiKeys || []}
-        preselectedApiKeyId={preselectedApiKeyId}
-        initialTokenStats={{
-          total: totalTokens,
-          prompt: totalPromptTokens,
-          completion: totalCompletionTokens,
-        }}
-      />
+      <main className="flex-1 overflow-hidden">
+        <div className="mx-auto flex h-full max-w-7xl flex-col lg:flex-row">
+          <div className="flex flex-1 min-h-0">
+            <ChatInterface
+              chatId={chat.id}
+              initialMessages={messages || []}
+              apiKeys={apiKeys || []}
+              preselectedApiKeyId={preselectedApiKeyId}
+              initialTokenStats={{
+                total: totalTokens,
+                prompt: totalPromptTokens,
+                completion: totalCompletionTokens,
+              }}
+            />
+          </div>
+          <ChatSummariesPanel
+            summaries={summaries || []}
+            totalMessages={totalMessagesCount}
+          />
+        </div>
+      </main>
     </div>
   )
 }
