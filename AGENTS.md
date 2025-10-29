@@ -13,6 +13,7 @@ Stick to npm scripts for parity with CI.
 - `npm run build`: Compiles the production bundle; catch type/config regressions before release.
 - `npm run start`: Serves the built app for production smoke tests.
 - `CI=1 npm run lint`: Runs ESLint in non-interactive mode (avoids the Next.js prompt); auto-fix via `next lint --fix` when handy.
+- `npm run test`: Executes Vitest suites (unit + integration) that are also enforced in CI.
 
 ## Coding Style & Naming Conventions
 TypeScript + Tailwind dominate; mirror the patterns in `src/app/dashboard`.
@@ -22,10 +23,13 @@ TypeScript + Tailwind dominate; mirror the patterns in `src/app/dashboard`.
 - Order Tailwind classes from layout → spacing → color for readability.
 
 ## Testing Guidelines
-Automated tests are pending, so rely on linting and targeted manual checks.
-- Add new tests beside the feature (`src/app/dashboard/__tests__/usage.test.tsx`) with `vitest` + `@testing-library/react`.
-- Exercise Supabase mutations against a local project and commit updated migrations.
-- Run `npm run lint` and manually walk the impacted UI flows before pushing.
+CI blocks merges unless both lint and tests succeed.
+- Unit coverage lives next to the feature when practical (e.g. `src/lib/chat-summaries.test.ts`).
+- Integration smoke tests are located at:
+  - `src/lib/chat-summaries.integration.test.ts` (hierarchical memory scheduler, in-memory Supabase harness)
+  - `src/app/api/chat/route.test.ts` (chat endpoint ownership, persistence, summary trigger)
+- New features should ship with Vitest coverage or a documented rationale. Use dependency injection or minimal mocks to avoid network calls.
+- Before merging: run `CI=1 npm run lint` and `npm run test`, then perform a brief manual chat to confirm UI regressions are absent.
 
 ## Commit & Pull Request Guidelines
 Commits follow concise Conventional Commit prefixes (`feat:`, `docs:`, `chore:`) with imperative summaries; English or Korean is fine.
@@ -43,3 +47,4 @@ Two AI agents contribute here: Codex (CLI-based; primary for code edits) and Cla
 - Announce ownership of ongoing tasks in the shared channel to avoid duplicate patches.  
 - Codex should prioritize implementation details and lint fixes; Claude can focus on reviews, high-level strategy, or documentation when Codex is mid-change.  
 - When both touch the same feature, pin the source of truth (`main` branch or a shared PR) before handing off to prevent drift.
+- Keep the CI badge green: if a PR breaks lint/tests, coordinate quickly to unblock deployment announcements.

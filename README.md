@@ -1,8 +1,9 @@
 # CharacterChat Platform
 
-**Phase 0 (v0.1.3)** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
+**Phase 0 (v0.1.4)** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
 
 [![Deploy Status](https://img.shields.io/badge/deploy-success-brightgreen)](https://mycharacterchatplatform.vercel.app)
+[![CI](https://github.com/devforai-creator/my-platform/actions/workflows/test.yml/badge.svg)](https://github.com/devforai-creator/my-platform/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 프로젝트 개요
@@ -186,6 +187,21 @@ my_characterchat_platform/
 ├── CHANGELOG.md
 └── 플랫폼 사업v1.0.2.md
 ```
+
+## 테스트 & QA
+
+### 자동화 테스트
+- `npm run test`: Vitest 기반 단위/통합 스모크.  
+  - `src/lib/chat-summaries.integration.test.ts`: 계층적 요약 파이프라인이 청크/메타 요약을 생성하는지 검증합니다.
+  - `src/app/api/chat/route.test.ts`: `/api/chat`가 소유권을 강제하고 메시지를 저장한 뒤 요약 큐를 트리거하는지 확인합니다.
+- `CI=1 npm run lint`: Next.js ESLint 규칙을 CI 모드로 실행합니다. (배포 전 최소 1회)
+
+GitHub Actions가 모든 푸시와 PR에서 위 테스트를 자동으로 실행합니다. 워크플로우가 실패하면 수정 후 재시도하세요.
+
+### 수동 스모크 체크
+1. Supabase 프로젝트 URL과 anon key가 배포 환경 변수에 있는지 확인합니다.
+2. 실제 API 키로 채팅을 20턴 이상 진행하여 요약 패널에 청크/메타 요약이 나타나는지 확인합니다.
+3. 토큰 통계(총/입력/출력)가 메시지 전송 직후 업데이트되는지 확인합니다.
 
 ## 데이터베이스 스키마
 

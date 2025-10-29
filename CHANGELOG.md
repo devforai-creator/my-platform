@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2025-10-29
+
+### Added
+- Continuous integration workflow (`.github/workflows/test.yml`) that runs `npm run test` for every push and pull request.
+- API smoke coverage for `/api/chat`, verifying ownership enforcement, message persistence, and summary trigger hooks (`src/app/api/chat/route.test.ts`).
+- In-memory Supabase harness to exercise the hierarchical memory pipeline end-to-end (`src/lib/chat-summaries.integration.test.ts`).
+
+### Changed
+- Sanitized summarization logs to prevent transcript leakage while retaining minimal fallback diagnostics.
+- Updated contributor docs to highlight the new automated tests and coordination expectations.
+
+### Fixed
+- ESLint `no-explicit-any` violations inside test harnesses.
+
 ## [0.1.3] - 2025-10-29
 
 ### Added
