@@ -8,6 +8,8 @@ import {
   updateSummaries,
   type SanitizedMessage,
 } from '@/lib/chat-summaries'
+import { createAdminClient } from '@/lib/supabase/admin'
+import type { Database } from '@/types/database.types'
 
 export const runtime = 'edge'
 export const maxDuration = 60 // 60초 타임아웃
@@ -61,6 +63,7 @@ export async function POST(req: Request) {
     }
 
     const supabase = await createClient()
+    const adminSupabase = createAdminClient()
 
     // 사용자 인증 확인
     const {
@@ -85,11 +88,18 @@ export async function POST(req: Request) {
     }
 
     // Vault에서 실제 API 키 복호화
-    const { data: secretData } = await supabase.rpc('get_decrypted_secret', {
+    const getSecretArgs = {
       secret_name: apiKeyData.vault_secret_name,
-    })
+      requester: user.id,
+    } satisfies Database['public']['Functions']['get_decrypted_secret']['Args']
 
-    if (!secretData) {
+    const { data: secretData, error: secretError } = await adminSupabase.rpc(
+      'get_decrypted_secret',
+      getSecretArgs as never
+    )
+
+    if (secretError || !secretData) {
+      console.error('Failed to decrypt API key:', secretError)
       return new Response('Failed to decrypt API key', { status: 500 })
     }
 

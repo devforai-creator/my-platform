@@ -237,7 +237,13 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_decrypted_secret: {
+        Args: {
+          secret_name: string
+          requester?: string | null
+        }
+        Returns: string
+      }
     }
     Enums: {
       character_visibility: CharacterVisibility

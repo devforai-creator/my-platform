@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { logout } from '../auth/actions'
+import QuickStartGuide from './QuickStartGuide'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -171,25 +172,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* 시작 가이드 */}
-        <div className="mt-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-300 mb-3">
-            🚀 시작 가이드
-          </h3>
-          <ol className="space-y-2 text-sm text-blue-800 dark:text-blue-300">
-            <li className="flex items-start">
-              <span className="font-semibold mr-2">1.</span>
-              <span>API 키를 등록하세요 (Google 무료 티어 추천)</span>
-            </li>
-            <li className="flex items-start">
-              <span className="font-semibold mr-2">2.</span>
-              <span>첫 캐릭터를 생성하세요</span>
-            </li>
-            <li className="flex items-start">
-              <span className="font-semibold mr-2">3.</span>
-              <span>캐릭터와 대화를 시작하세요!</span>
-            </li>
-          </ol>
-        </div>
+        <QuickStartGuide />
       </main>
     </div>
   )

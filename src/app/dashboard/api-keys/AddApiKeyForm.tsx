@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createApiKey } from './actions'
+import GoogleApiKeySidePanel from './GoogleApiKeySidePanel'
 
 const PROVIDERS = [
   { value: 'google', label: 'Google (Gemini)', recommended: true },
@@ -34,6 +35,7 @@ export default function AddApiKeyForm() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [isGuideOpen, setIsGuideOpen] = useState(false)
 
   async function handleSubmit(formData: FormData) {
     setLoading(true)
@@ -55,22 +57,47 @@ export default function AddApiKeyForm() {
   }
 
   return (
-    <form
-      id="add-api-key-form"
-      action={handleSubmit}
-      className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700"
-    >
-      {error && (
-        <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
-          {error}
-        </div>
-      )}
+    <>
+      <form
+        id="add-api-key-form"
+        action={handleSubmit}
+        className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700"
+      >
+        {/* Guide Button */}
+        {provider === 'google' && (
+          <button
+            type="button"
+            onClick={() => setIsGuideOpen(true)}
+            className="w-full mb-4 py-3 px-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+              />
+            </svg>
+            <span>📖 Google API 키 발급 가이드 보기</span>
+          </button>
+        )}
 
-      {success && (
-        <div className="mb-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 px-4 py-3 rounded-lg text-sm">
-          API 키가 안전하게 등록되었습니다!
-        </div>
-      )}
+        {error && (
+          <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 px-4 py-3 rounded-lg text-sm">
+            API 키가 안전하게 등록되었습니다!
+          </div>
+        )}
 
       <div className="space-y-4">
         {/* Provider 선택 */}
@@ -150,45 +177,13 @@ export default function AddApiKeyForm() {
           {loading ? '등록 중...' : 'API 키 등록'}
         </button>
       </div>
-
-      {/* 가이드 링크 */}
-      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-          API 키 발급 방법:
-        </p>
-        <ul className="text-xs text-blue-600 dark:text-blue-400 space-y-1">
-          <li>
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:underline"
-            >
-              → Google Gemini API 키 발급
-            </a>
-          </li>
-          <li>
-            <a
-              href="https://platform.openai.com/api-keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:underline"
-            >
-              → OpenAI API 키 발급
-            </a>
-          </li>
-          <li>
-            <a
-              href="https://console.anthropic.com/settings/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:underline"
-            >
-              → Anthropic API 키 발급
-            </a>
-          </li>
-        </ul>
-      </div>
     </form>
+
+      {/* Side Panel */}
+      <GoogleApiKeySidePanel
+        isOpen={isGuideOpen}
+        onClose={() => setIsGuideOpen(false)}
+      />
+    </>
   )
 }

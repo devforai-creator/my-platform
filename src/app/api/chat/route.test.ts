@@ -6,12 +6,14 @@ const hoistedMocks = vi.hoisted(() => {
   const updateSummariesMock = vi.fn()
   const streamTextMock = vi.fn()
   const createClientMock = vi.fn()
+  const createAdminClientMock = vi.fn()
 
   return {
     buildContextMock,
     updateSummariesMock,
     streamTextMock,
     createClientMock,
+    createAdminClientMock,
     aiModuleFactory: async () => {
       const actual = (await vi.importActual<typeof import('ai')>('ai')) ?? {}
       return {
@@ -78,9 +80,14 @@ vi.mock('@ai-sdk/anthropic', () => ({
 }))
 
 const createClientMock = hoistedMocks.createClientMock
+const createAdminClientMock = hoistedMocks.createAdminClientMock
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: () => createClientMock(),
+}))
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: () => createAdminClientMock(),
 }))
 
 import { POST } from './route'
@@ -138,15 +145,6 @@ class SupabaseRouteMock {
     }),
   }
 
-  rpc(name: string, params: Record<string, unknown>) {
-    if (name === 'get_decrypted_secret') {
-      const secret = this.fixture.decryptedSecret ?? `decrypted-${String(params.secret_name ?? '')}`
-      return Promise.resolve({ data: secret, error: null })
-    }
-
-    throw new Error(`Unsupported RPC: ${name}`)
-  }
-
   from(table: string) {
     switch (table) {
       case 'api_keys':
@@ -160,6 +158,30 @@ class SupabaseRouteMock {
       default:
         throw new Error(`Unsupported table: ${table}`)
     }
+  }
+}
+
+class SupabaseAdminMock {
+  constructor(private readonly fixture: SupabaseFixture) {}
+
+  rpc(name: string, params: Record<string, unknown>) {
+    if (name !== 'get_decrypted_secret') {
+      throw new Error(`Unsupported admin RPC: ${name}`)
+    }
+
+    const requester = params.requester
+    if (requester !== this.fixture.user.id) {
+      return Promise.resolve({
+        data: null,
+        error: { message: 'Not authorized' },
+      })
+    }
+
+    const secret =
+      this.fixture.decryptedSecret ??
+      `decrypted-${String(params.secret_name ?? '')}`
+
+    return Promise.resolve({ data: secret, error: null })
   }
 }
 
@@ -279,7 +301,11 @@ class MessagesTable {
 }
 
 function createSupabaseMock(fixture: SupabaseFixture) {
-  return new SupabaseRouteMock(fixture)
+  const routeMock = new SupabaseRouteMock(fixture)
+  const adminMock = new SupabaseAdminMock(fixture)
+  createClientMock.mockReturnValue(routeMock)
+  createAdminClientMock.mockReturnValue(adminMock)
+  return routeMock
 }
 
 describe('POST /api/chat', () => {
@@ -288,6 +314,7 @@ describe('POST /api/chat', () => {
     updateSummariesMock.mockReset()
     streamTextMock.mockReset()
     createClientMock.mockReset()
+    createAdminClientMock.mockReset()
 
     buildContextMock.mockImplementation(async ({ sanitizedMessages }) => ({
       systemPrompt: 'SYSTEM PROMPT',
@@ -314,7 +341,7 @@ describe('POST /api/chat', () => {
   })
 
   it('enforces chat ownership and returns 404 when chat is missing', async () => {
-    const supabase = createSupabaseMock({
+    createSupabaseMock({
       user: { id: 'user-1' },
       apiKeys: [
         {
@@ -341,8 +368,6 @@ describe('POST /api/chat', () => {
         },
       ],
     })
-
-    createClientMock.mockResolvedValueOnce(supabase)
 
     const request = new Request('http://localhost/api/chat', {
       method: 'POST',
@@ -386,8 +411,6 @@ describe('POST /api/chat', () => {
         },
       ],
     })
-
-    createClientMock.mockResolvedValueOnce(supabase)
 
     const request = new Request('http://localhost/api/chat', {
       method: 'POST',
@@ -493,8 +516,6 @@ describe('POST /api/chat', () => {
       }
     })
 
-    createClientMock.mockResolvedValueOnce(supabase)
-
     const request = new Request('http://localhost/api/chat', {
       method: 'POST',
       body: JSON.stringify({
@@ -569,8 +590,6 @@ describe('POST /api/chat', () => {
         },
       }
     })
-
-    createClientMock.mockResolvedValueOnce(supabase)
 
     const request = new Request('http://localhost/api/chat', {
       method: 'POST',
