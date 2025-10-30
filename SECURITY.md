@@ -160,6 +160,80 @@ FROM information_schema.routine_privileges
 WHERE routine_name = 'get_decrypted_secret';
 ```
 
+#### Attack Simulation (Penetration Test)
+
+To verify the patch blocks real attack scenarios, follow this penetration test:
+
+**Test 1: Client-Side Data Exposure Check**
+
+Browser console:
+```javascript
+// Check if vault_secret_name is exposed to client
+document.body.innerText.includes('api_key_')
+// Expected: false ✅
+```
+
+**Result**: `vault_secret_name` is NOT included in SELECT queries (see `src/app/dashboard/api-keys/page.tsx:21`), preventing attackers from knowing secret names.
+
+---
+
+**Test 2: Direct RPC Call Attempt (SQL Editor)**
+
+Supabase SQL Editor:
+```sql
+-- 1. Get your vault_secret_name (requires authenticated session)
+SELECT id, provider, vault_secret_name
+FROM api_keys
+WHERE user_id = auth.uid();
+
+-- 2. Try to decrypt (should be blocked)
+SELECT get_decrypted_secret('api_key_xxx_google_xxx');
+```
+
+**Expected Result**:
+```
+ERROR: 42501: Not authorized
+CONTEXT: PL/pgSQL function get_decrypted_secret(text,uuid) line 9 at RAISE
+```
+
+✅ **Verified on 2025-10-30**: Patch successfully blocks unauthorized decryption.
+
+---
+
+**Test 3: Browser Console Attack (Theoretical)**
+
+Even if an attacker loads Supabase client in browser:
+
+```javascript
+// Attacker loads Supabase SDK via CDN
+import('https://cdn.skypack.dev/@supabase/supabase-js').then(async ({ createClient }) => {
+  const client = createClient('SUPABASE_URL', 'ANON_KEY')
+
+  // Attempt to call RPC with guessed secret_name
+  const { data, error } = await client.rpc('get_decrypted_secret', {
+    secret_name: 'api_key_guess'
+  })
+
+  console.log(error ? '✅ BLOCKED: ' + error.message : '⚠️ LEAKED')
+})
+```
+
+**Expected Result**: `permission denied for function get_decrypted_secret`
+
+**Why Attack Fails**:
+1. RPC function revoked from `authenticated` role
+2. `vault_secret_name` not exposed in client queries
+3. Ownership validation in function logic
+4. Service-role only decryption
+
+---
+
+**Defense Layers**:
+- 🛡️ Layer 1: `vault_secret_name` not sent to client (data minimization)
+- 🛡️ Layer 2: RPC permission denied for `authenticated` role
+- 🛡️ Layer 3: Explicit ownership validation in function (`requester` parameter)
+- 🛡️ Layer 4: Server-side admin client for legitimate decryption only
+
 ---
 
 ## Security Best Practices for Contributors
