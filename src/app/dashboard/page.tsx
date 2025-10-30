@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { logout } from '../auth/actions'
 import QuickStartGuide from './QuickStartGuide'
+import SecurityNoticeBanner from './SecurityNoticeBanner'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -63,6 +64,9 @@ export default async function DashboardPage() {
 
       {/* 메인 콘텐츠 */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 보안 공지 배너 */}
+        <SecurityNoticeBanner />
+
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
             환영합니다! 👋
