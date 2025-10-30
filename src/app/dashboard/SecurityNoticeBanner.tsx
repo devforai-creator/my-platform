@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 
+// 배너 자동 만료 날짜 (2025-11-06 = 1주일 후)
+const BANNER_EXPIRE_DATE = new Date('2025-11-06T23:59:59')
+
 export default function SecurityNoticeBanner() {
   const [isDismissed, setIsDismissed] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -10,6 +13,11 @@ export default function SecurityNoticeBanner() {
     }
     return false
   })
+
+  // 만료일 체크
+  const isExpired = new Date() > BANNER_EXPIRE_DATE
+
+  if (isExpired) return null
 
   const handleDismiss = () => {
     localStorage.setItem('security-notice-v0.1.5-dismissed', 'true')
