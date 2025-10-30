@@ -46,7 +46,7 @@ When reviewing code or making changes, be aware that both agents may have contri
 
 ## Project Overview
 
-CharacterChat Platform - A BYOK (Bring Your Own Key) character chat platform built with Next.js 15, Supabase, and Vercel AI SDK. Users register their own API keys (Google, OpenAI, Anthropic) to chat with custom AI characters. Currently at Phase 0 (v0.1.2).
+CharacterChat Platform - A BYOK (Bring Your Own Key) character chat platform built with Next.js 15, Supabase, and Vercel AI SDK. Users register their own API keys (Google, OpenAI, Anthropic) to chat with custom AI characters. Currently at Phase 0 (v0.1.5).
 
 ## Development Commands
 
@@ -79,13 +79,19 @@ npx tsc --noEmit     # Type check without building
 
 ### API Key Security Architecture
 
-**Critical Security Pattern** (v0.1.2+):
+**Critical Security Pattern** (v0.1.5+):
 1. User's raw API keys are NEVER stored in database tables
 2. Keys are encrypted in Supabase Vault with unique secret names
 3. `api_keys` table only stores `vault_secret_name` reference
 4. **Client never sees `vault_secret_name`** - server looks it up by API key ID
-5. Edge Runtime API route (`/api/chat/route.ts`) decrypts keys server-side using `get_decrypted_secret` RPC
-6. **Vault RPCs verify `auth.uid()` ownership** before decrypt/delete
+5. **Service-role ONLY decryption**: `get_decrypted_secret` RPC is restricted to `service_role`, preventing browser-based exfiltration (XSS, malicious extensions)
+6. Edge Runtime API route (`/api/chat/route.ts`) uses admin client (`src/lib/supabase/admin.ts`) to decrypt keys
+7. **Vault RPCs verify explicit `requester` parameter** for ownership validation
+
+**Security Improvement (v0.1.5)**:
+- BLOCKED: Browser clients can no longer call `get_decrypted_secret` directly
+- REQUIRED: Server-side admin client with `SUPABASE_SERVICE_ROLE_KEY`
+- Migration: `04_secure_get_decrypted_secret.sql`
 
 **Storing API Keys**:
 ```typescript
@@ -104,11 +110,15 @@ await supabase.from('api_keys').insert({
 });
 ```
 
-**Retrieving API Keys**:
+**Retrieving API Keys** (v0.1.5+):
 ```typescript
-// Only on Edge Runtime server (never client-side)
-const { data: secretData } = await supabase.rpc('get_decrypted_secret', {
-  secret_name: apiKeyData.vault_secret_name
+// ONLY on Edge Runtime server with admin client
+import { createAdminClient } from '@/lib/supabase/admin'
+
+const adminSupabase = createAdminClient()  // Uses SERVICE_ROLE_KEY
+const { data: secretData } = await adminSupabase.rpc('get_decrypted_secret', {
+  secret_name: apiKeyData.vault_secret_name,
+  requester: user.id  // Explicit ownership validation
 });
 ```
 
@@ -278,12 +288,29 @@ export default function MyComponent() {
 3. Copy API keys from Settings → API
 4. Set environment variables in `.env.local`
 
-**Vault RPC Functions** (defined in `01_vault_helpers.sql`):
-- `store_encrypted_secret(secret_name, secret_value)` - Store API key
-- `get_decrypted_secret(secret_name)` - Retrieve API key (**v0.1.2+: verifies `auth.uid()` ownership**)
-- `delete_secret(secret_name)` - Delete secret (**v0.1.2+: verifies ownership**)
+**Vault RPC Functions**:
+- `store_encrypted_secret(secret_name, secret_value)` - Store API key (defined in `01_vault_helpers.sql`)
+- `get_decrypted_secret(secret_name, requester)` - Retrieve API key (**v0.1.5+: service_role ONLY, explicit requester validation**)
+  - Defined in `04_secure_get_decrypted_secret.sql`
+  - Blocks browser/authenticated role access
+- `delete_secret(secret_name)` - Delete secret (verifies ownership)
 
 ## Recent Updates
+
+### v0.1.5 (2025-10-30) - Critical Security + Onboarding
+
+🔒 **Critical Security Enhancement**:
+- **Blocked client-side Vault access**: `get_decrypted_secret` RPC now restricted to `service_role` only
+  - Prevents XSS/browser-based API key exfiltration
+  - Migration: `04_secure_get_decrypted_secret.sql`
+- **Admin client**: New `src/lib/supabase/admin.ts` for server-only operations with SERVICE_ROLE_KEY
+- **Updated `/api/chat`**: Now uses admin client for secure Vault decryption
+
+✨ **UX Improvements**:
+- **Onboarding Guide**: Interactive side panel for Google Gemini API key setup
+  - 5-step guide with screenshots
+  - Opens from dashboard and API keys page
+  - Users can view guide while filling registration form
 
 ### v0.1.2 (2025-10-29) - Security Patch
 
@@ -299,7 +326,7 @@ export default function MyComponent() {
 ✅ **Token Statistics**: Real-time display in chat interface + dashboard statistics card
 ✅ **Cost Monitoring**: Users can now track token usage to manage API costs
 
-## Known Issues & Limitations (v0.1.2)
+## Known Issues & Limitations (v0.1.5)
 
 - **Fixed Context Window**: Currently hardcoded to 20 messages, no UI to customize
 - **No Chat Export**: Cannot export chat history yet

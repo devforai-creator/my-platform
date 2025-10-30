@@ -1,6 +1,6 @@
 # CharacterChat Platform
 
-**Phase 0 (v0.1.4)** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
+**Phase 0 (v0.1.5)** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
 
 [![Deploy Status](https://img.shields.io/badge/deploy-success-brightgreen)](https://mycharacterchatplatform.vercel.app)
 [![CI](https://github.com/devforai-creator/my-platform/actions/workflows/test.yml/badge.svg)](https://github.com/devforai-creator/my-platform/actions/workflows/test.yml)
@@ -26,8 +26,9 @@
 
 ✅ **API 키 관리 (BYOK)**
 - Google Gemini, OpenAI, Anthropic 지원
-- Supabase Vault 암호화 저장
+- Supabase Vault 암호화 저장 (service-role 전용 복호화)
 - 모델별 선호도 설정
+- 인터랙티브 온보딩 가이드 (Google API 키 발급 5단계)
 
 ✅ **캐릭터 관리**
 - 1:1 캐릭터 대화 템플릿
@@ -181,8 +182,11 @@ my_characterchat_platform/
 │   └── middleware.ts             # 인증 미들웨어
 ├── supabase/
 │   └── migrations/
-│       ├── 00_initial_schema.sql # 초기 스키마
-│       └── 01_vault_helpers.sql  # Vault RPC 함수
+│       ├── 00_initial_schema.sql              # 초기 스키마
+│       ├── 01_vault_helpers.sql               # Vault RPC 함수
+│       ├── 02_update_vault_delete_secret.sql  # Vault 삭제 수정
+│       ├── 03_chat_summaries.sql              # 장기기억 테이블
+│       └── 04_secure_get_decrypted_secret.sql # Vault 보안 강화 ⚠️
 ├── SUPABASE_SETUP.md
 ├── CHANGELOG.md
 └── 플랫폼 사업v1.0.2.md
@@ -217,7 +221,9 @@ GitHub Actions가 모든 푸시와 PR에서 위 테스트를 자동으로 실행
 
 - **Row Level Security (RLS)**: 모든 테이블에 적용
 - **Supabase Vault**: API 키 암호화 저장
+- **Service-role 전용 복호화** (v0.1.5): 브라우저에서 Vault 직접 접근 차단, XSS 공격 방어
 - **Edge Runtime Proxy**: 클라이언트에 API 키 노출 방지
+- **Admin Client**: 서버 전용 Supabase 클라이언트로 민감한 작업 처리
 
 상세 스키마는 `supabase/migrations/` 참조
 
@@ -281,8 +287,9 @@ GitHub에 push하면 자동으로 Vercel에 배포됩니다.
 #### 1. **개발자도 API 키를 볼 수 없음**
 - API 키는 등록 즉시 **Supabase Vault**로 암호화되어 저장됩니다
 - 데이터베이스를 직접 확인해도 암호화된 덩어리만 보입니다
+- **v0.1.5 보안 강화**: 복호화는 오직 `service_role`만 가능, 브라우저에서 절대 접근 불가
 - 채팅할 때만 Edge Runtime(서버)에서 순간적으로 복호화하고 즉시 폐기됩니다
-- 증거 코드: [`supabase/migrations/01_vault_helpers.sql`](./supabase/migrations/01_vault_helpers.sql)
+- 증거 코드: [`supabase/migrations/04_secure_get_decrypted_secret.sql`](./supabase/migrations/04_secure_get_decrypted_secret.sql)
 
 #### 2. **GitHub-Vercel 자동 배포**
 - 현재 이 저장소는 Vercel과 자동 연동되어 있습니다
@@ -304,6 +311,7 @@ GitHub에 push하면 자동으로 Vercel에 배포됩니다.
 
 ### API 키 보호 메커니즘
 - ✅ Supabase Vault 암호화 저장
+- ✅ Service-role 전용 복호화 (v0.1.5 - XSS 공격 차단)
 - ✅ Row Level Security로 사용자 격리
 - ✅ Edge Runtime 프록시로 클라이언트 노출 방지
 - ✅ HTTPS 통신

@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2025-10-30
+
+### 🔒 Security (Critical)
+- **Blocked client-side Vault access**: Moved API key decryption to service-role only, preventing XSS/browser-based key exfiltration
+  - Created `src/lib/supabase/admin.ts` for server-only admin client
+  - Updated `/api/chat` to use admin client for Vault operations
+  - Migration `04_secure_get_decrypted_secret.sql`: Revoked `authenticated` role access, granted only to `service_role`
+  - RPC now requires explicit `requester` parameter for ownership validation
+- **Impact**: Attackers can no longer steal API keys from authenticated browser sessions
+
+### Added
+- **Onboarding Guide**: Interactive side panel for Google Gemini API key setup
+  - 5-step guide with screenshots (`public/guides/google-api/`)
+  - Side panel opens from dashboard and API keys page
+  - Users can view guide while filling registration form
+  - Smooth slide-in animation with backdrop
+  - Component: `GoogleApiKeySidePanel.tsx`
+- **QuickStartGuide component**: Extracted dashboard guide section to client component with side panel integration
+
+### Changed
+- Database types: Added `get_decrypted_secret` function signature with `requester` parameter
+- Test suite: Updated mocks for admin client in `route.test.ts`
+- UX consistency: Removed duplicate standalone guide page, unified on side panel approach
+
+### Fixed
+- TypeScript build errors related to RPC function type inference
+- Removed redundant API key guide links from multiple locations
+
+### Migration Required
+⚠️ **MUST RUN** `supabase/migrations/04_secure_get_decrypted_secret.sql` before deploying to production
+
+---
+
 ## [0.1.4] - 2025-10-29
 
 ### Added
