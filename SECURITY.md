@@ -1,0 +1,204 @@
+# Security Policy
+
+## Reporting a Vulnerability
+
+If you discover a security vulnerability in this project, please report it responsibly:
+
+1. **DO NOT** open a public GitHub issue
+2. Contact us via GitHub Security Advisories (preferred):
+   - Go to the repository → Security tab → Report a vulnerability
+3. Or email the maintainer directly (check GitHub profile)
+
+We will respond within **48 hours** and provide a timeline for the fix.
+
+## Security Architecture
+
+### API Key Protection (BYOK Model)
+
+This platform uses a **Bring Your Own Key (BYOK)** model where users register their own API keys (Google, OpenAI, Anthropic). Protecting these keys is our highest priority.
+
+**Multi-Layer Protection**:
+1. **Supabase Vault Encryption**: All API keys are encrypted at rest using Supabase Vault
+2. **Service-Role Only Decryption** (v0.1.5+): Only server-side code with `SUPABASE_SERVICE_ROLE_KEY` can decrypt keys
+3. **Row Level Security (RLS)**: Database policies ensure users can only access their own data
+4. **Edge Runtime Proxy**: API keys are never exposed to the browser
+5. **HTTPS Only**: All communications are encrypted in transit
+
+**Reference**:
+- Migration: `supabase/migrations/04_secure_get_decrypted_secret.sql`
+- Admin Client: `src/lib/supabase/admin.ts`
+- API Route: `src/app/api/chat/route.ts`
+
+### Authentication
+
+- **Provider**: Supabase Auth
+- **Email Verification**: Enabled (as of v0.1.5)
+- **Protected Routes**: All `/dashboard/*` routes require authentication
+- **JWT Tokens**: Automatically managed by Supabase SSR
+
+### Database Security
+
+- **Row Level Security (RLS)**: Enabled on all tables (`profiles`, `api_keys`, `characters`, `chats`, `messages`)
+- **User Isolation**: Queries automatically filter by `auth.uid()` to prevent cross-user access
+- **Vault RPC Functions**: All RPC functions verify ownership before decryption/deletion
+
+## Supported Versions
+
+| Version | Supported          |
+| ------- | ------------------ |
+| 0.1.5   | :white_check_mark: |
+| 0.1.4   | :x: (Critical vulnerability) |
+| < 0.1.4 | :x:                |
+
+**Please upgrade to v0.1.5 immediately if you are self-hosting.**
+
+## Security Incidents
+
+### Critical: Client-Side Vault Access (2025-10-30)
+
+**Status**: ✅ Resolved in v0.1.5
+
+#### Vulnerability Details
+
+**CVE**: N/A (Privately disclosed and patched)
+**Severity**: Critical
+**Discovered By**: Codex (internal security review)
+**Affected Versions**: v0.1.0 - v0.1.4
+**Date Discovered**: 2025-10-30
+**Date Patched**: 2025-10-30
+
+#### Description
+
+The `get_decrypted_secret` RPC function was accessible to authenticated users in browsers, allowing XSS attacks or malicious browser extensions to directly call the function and exfiltrate API keys.
+
+**Attack Scenario**:
+1. Attacker injects XSS payload or installs malicious browser extension
+2. Script calls `supabase.rpc('get_decrypted_secret', { secret_name: 'api_key_...' })`
+3. Vault returns decrypted API key to browser
+4. Attacker exfiltrates key to external server
+
+**Root Cause**:
+- RPC function granted to `authenticated` role instead of `service_role` only
+- No server-side enforcement of decryption access
+
+#### Timeline
+
+- **2025-10-30 10:00 KST**: Codex discovers vulnerability during code review
+- **2025-10-30 10:30 KST**: Vulnerability confirmed, patch development begins
+- **2025-10-30 11:00 KST**: Migration 04 created, admin client pattern implemented
+- **2025-10-30 11:30 KST**: Patch deployed to production
+- **2025-10-30 12:00 KST**: Security response executed:
+  - All existing API keys deleted (~5 users affected)
+  - Security notice banner deployed
+  - Email verification enabled for new signups
+
+#### Patch
+
+**Migration**: `supabase/migrations/04_secure_get_decrypted_secret.sql`
+
+Key Changes:
+```sql
+-- Revoke access from authenticated/anon roles
+revoke all on function public.get_decrypted_secret(text, uuid) from public, anon, authenticated;
+
+-- Grant only to service_role
+grant execute on function public.get_decrypted_secret(text, uuid) to service_role;
+```
+
+**Code Changes**:
+- Created `src/lib/supabase/admin.ts` for service-role client
+- Updated `/api/chat/route.ts` to use admin client for Vault access
+- Added explicit `requester` parameter for ownership validation
+
+#### Impact
+
+- **User Count**: ~5 users (Phase 0 MVP)
+- **Data Compromised**: None (no evidence of exploitation)
+- **Action Required**: Users must re-register API keys
+
+#### Response Actions
+
+1. ✅ Deployed patch (migration 04)
+2. ✅ Deleted all existing API keys from database
+3. ✅ Added security notice banner (`SecurityNoticeBanner.tsx`)
+4. ✅ Enabled email verification for new signups
+5. ✅ Updated documentation (README.md, CHANGELOG.md, CLAUDE.md)
+
+#### Lessons Learned
+
+1. **PostgreSQL RLS ≠ RPC Security**: RLS policies on tables don't automatically apply to RPC functions
+2. **`SECURITY DEFINER` Risks**: Functions with `SECURITY DEFINER` bypass RLS and need explicit role restrictions
+3. **Defense in Depth**: Always assume browser can be compromised (XSS, extensions)
+4. **Testing**: Need automated tests for RPC function permissions
+
+#### Recommendations for Self-Hosters
+
+If you are self-hosting v0.1.4 or earlier:
+
+1. **Upgrade immediately** to v0.1.5
+2. Run migration `04_secure_get_decrypted_secret.sql` in Supabase SQL Editor
+3. Set `SUPABASE_SERVICE_ROLE_KEY` environment variable
+4. Delete existing API keys: `DELETE FROM api_keys;`
+5. Notify users to re-register API keys
+
+#### Verification
+
+Check if patch is applied:
+
+```sql
+-- Verify RPC function signature
+SELECT p.proname, pg_get_function_arguments(p.oid)
+FROM pg_proc p
+JOIN pg_namespace n ON p.pronamespace = n.oid
+WHERE n.nspname = 'public' AND p.proname = 'get_decrypted_secret';
+
+-- Should show: get_decrypted_secret(secret_name text, requester uuid)
+
+-- Verify permissions (should only show service_role)
+SELECT grantee, privilege_type
+FROM information_schema.routine_privileges
+WHERE routine_name = 'get_decrypted_secret';
+```
+
+---
+
+## Security Best Practices for Contributors
+
+If you are contributing code to this project:
+
+### Server Actions
+- [ ] Always call `auth.getUser()` to verify authentication
+- [ ] Filter queries by `user_id` to enforce ownership
+- [ ] Never trust client-provided IDs without server-side validation
+
+### RPC Functions
+- [ ] Use `auth.uid()` to get current user
+- [ ] Verify ownership before returning sensitive data
+- [ ] Grant to `service_role` only for Vault operations
+
+### API Routes
+- [ ] Validate all input parameters
+- [ ] Check resource ownership (e.g., chat belongs to user)
+- [ ] Use admin client for Vault access only
+
+### References
+- See `CLAUDE.md` → "Security Patterns for AI" section
+- See `src/app/api/chat/route.ts` for secure API route example
+- See `supabase/migrations/04_secure_get_decrypted_secret.sql` for RPC security
+
+---
+
+## Transparency Commitment
+
+We believe in transparent security practices:
+
+- ✅ All security incidents are documented in this file
+- ✅ Patches are open-source and auditable
+- ✅ Users are notified of breaking security changes
+- ✅ No security through obscurity
+
+**This project is open-source. You can audit all code at [github.com/devforai-creator/my-platform](https://github.com/devforai-creator/my-platform).**
+
+---
+
+**Last Updated**: 2025-10-30
