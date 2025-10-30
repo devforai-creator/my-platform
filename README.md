@@ -1,6 +1,6 @@
 # CharacterChat Platform
 
-**Phase 0 (v0.1.5)** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
+**Phase 0 (v0.1.6)** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
 
 [![Deploy Status](https://img.shields.io/badge/deploy-success-brightgreen)](https://mycharacterchatplatform.vercel.app)
 [![CI](https://github.com/devforai-creator/my-platform/actions/workflows/test.yml/badge.svg)](https://github.com/devforai-creator/my-platform/actions/workflows/test.yml)
@@ -31,6 +31,7 @@
 - 인터랙티브 온보딩 가이드 (Google API 키 발급 5단계)
 
 ✅ **캐릭터 관리**
+- 스타터 캐릭터 (바로 사용 가능한 추천 캐릭터)
 - 1:1 캐릭터 대화 템플릿
 - 멀티 캐릭터 시뮬레이션 템플릿
 - 자유로운 시스템 프롬프트 작성
@@ -97,7 +98,7 @@
    - [Google AI Studio](https://aistudio.google.com/app/apikey) - 무료 티어 제공 ⭐
    - [OpenAI Platform](https://platform.openai.com/api-keys)
    - [Anthropic Console](https://console.anthropic.com/settings/keys)
-4. **캐릭터 생성** 후 바로 채팅 시작!
+4. **스타터 캐릭터** 선택하거나 **직접 생성** 후 바로 채팅 시작!
 
 ---
 

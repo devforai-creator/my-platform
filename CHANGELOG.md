@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2025-10-30
+
+### Added
+- **Starter Characters**: Pre-built characters ready for immediate use
+  - Global shared characters with `user_id = NULL` architecture
+  - Dedicated "시작하기" section on character list page
+  - First starter: Seoyeon (심리 상담 전문 캐릭터)
+  - Visual indicators: Starter badge, read-only UI
+  - Seed script: `seed-starter-character.ts` for admin deployment
+  - Character Card V2 metadata support in `metadata` JSONB field
+
+### 🔒 Security
+- **Hardened RLS policies** for starter characters (Migration `05_allow_starter_characters.sql`)
+  - Explicit `user_id IS NOT NULL` checks in INSERT/UPDATE/DELETE policies
+  - Prevents privilege escalation attempts (NULL = NULL edge case)
+  - Triple validation: INSERT checks `auth.uid() IS NOT NULL AND user_id = auth.uid() AND user_id IS NOT NULL`
+  - Service role can create/manage starters (RLS bypass)
+  - Users can read starters but cannot modify or delete them
+- **SELECT policy enhancement**: Starters visible only when `visibility = 'public' AND archived_at IS NULL`
+
+### Changed
+- **Character list page** (`/dashboard/characters`): Now displays starters and personal characters separately
+- **New chat page** (`/dashboard/chats/new`): Includes starters in character selection dropdown (sorted first)
+- **CharacterCard component**: Added `isStarter` prop to hide edit/delete buttons for starters
+- Database schema: `characters.user_id` now allows NULL values for starter characters
+
+### Migration Required
+⚠️ **MUST RUN** `supabase/migrations/05_allow_starter_characters.sql` before creating starter characters
+
+---
+
 ## [0.1.5] - 2025-10-30
 
 ### 🔒 Security (Critical)

@@ -42,15 +42,30 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 - **User Isolation**: Queries automatically filter by `auth.uid()` to prevent cross-user access
 - **Vault RPC Functions**: All RPC functions verify ownership before decryption/deletion
 
+#### Starter Characters (v0.1.6+)
+
+**Architecture**: Global shared characters with `user_id = NULL`
+
+**Security Model**:
+- **Service Role Only Creation**: Only server-side scripts with service role can create `user_id=NULL` characters
+- **Explicit NULL Blocking**: RLS policies explicitly check `user_id IS NOT NULL` to prevent privilege escalation
+- **Read-Only for Users**: Authenticated users can view starters but cannot modify or delete them
+- **Triple Validation**: INSERT/UPDATE/DELETE policies all verify `user_id IS NOT NULL`
+
+**Reference**:
+- Migration: `supabase/migrations/05_allow_starter_characters.sql`
+- Seed Script: `seed-starter-character.ts` (admin only)
+
 ## Supported Versions
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 0.1.6   | :white_check_mark: |
 | 0.1.5   | :white_check_mark: |
 | 0.1.4   | :x: (Critical vulnerability) |
 | < 0.1.4 | :x:                |
 
-**Please upgrade to v0.1.5 immediately if you are self-hosting.**
+**Please upgrade to v0.1.6 for the latest features and security improvements.**
 
 ## Security Incidents
 
@@ -275,4 +290,4 @@ We believe in transparent security practices:
 
 ---
 
-**Last Updated**: 2025-10-30
+**Last Updated**: 2025-10-30 (v0.1.6)

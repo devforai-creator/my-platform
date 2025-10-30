@@ -107,11 +107,18 @@ export default function NewChatForm({
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
           >
             <option value="">캐릭터를 선택하세요</option>
-            {characters.map((character) => (
-              <option key={character.id} value={character.id}>
-                {character.name}
-              </option>
-            ))}
+            {characters
+              .sort((a, b) => {
+                // 스타터를 먼저 표시
+                if (!a.user_id && b.user_id) return -1
+                if (a.user_id && !b.user_id) return 1
+                return 0
+              })
+              .map((character) => (
+                <option key={character.id} value={character.id}>
+                  {character.user_id ? character.name : `🌟 ${character.name} (추천)`}
+                </option>
+              ))}
           </select>
 
           {selectedCharacter && (

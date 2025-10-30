@@ -19,11 +19,11 @@ export default async function NewChatPage({ searchParams }: Props) {
     redirect('/auth/login')
   }
 
-  // 캐릭터 목록
+  // 캐릭터 목록 (본인 캐릭터 + 스타터)
   const { data: characters } = await supabase
     .from('characters')
     .select('*')
-    .eq('user_id', user.id)
+    .or(`user_id.eq.${user.id},user_id.is.null`)
     .is('archived_at', null)
     .order('name')
 

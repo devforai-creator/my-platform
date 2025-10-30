@@ -7,9 +7,10 @@ import { deleteCharacter } from './actions'
 
 interface Props {
   character: Character
+  isStarter?: boolean
 }
 
-export default function CharacterCard({ character }: Props) {
+export default function CharacterCard({ character, isStarter = false }: Props) {
   const [deleting, setDeleting] = useState(false)
 
   async function handleDelete() {
@@ -27,9 +28,16 @@ export default function CharacterCard({ character }: Props) {
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-              {character.name}
-            </h3>
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                {character.name}
+              </h3>
+              {isStarter && (
+                <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded-full">
+                  스타터
+                </span>
+              )}
+            </div>
             {character.description && (
               <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
                 {character.description}
@@ -80,19 +88,23 @@ export default function CharacterCard({ character }: Props) {
           >
             채팅 시작
           </Link>
-          <Link
-            href={`/dashboard/characters/${character.id}/edit`}
-            className="py-2 px-4 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors"
-          >
-            수정
-          </Link>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="py-2 px-4 border border-red-300 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-          >
-            {deleting ? '...' : '삭제'}
-          </button>
+          {!isStarter && (
+            <>
+              <Link
+                href={`/dashboard/characters/${character.id}/edit`}
+                className="py-2 px-4 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors"
+              >
+                수정
+              </Link>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="py-2 px-4 border border-red-300 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {deleting ? '...' : '삭제'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
