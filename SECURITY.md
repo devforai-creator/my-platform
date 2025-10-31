@@ -21,7 +21,7 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 1. **Supabase Vault Encryption**: All API keys are encrypted at rest using Supabase Vault
 2. **Service-Role Only Decryption** (v0.1.5+): Only server-side code with `SUPABASE_SERVICE_ROLE_KEY` can decrypt keys
 3. **Row Level Security (RLS)**: Database policies ensure users can only access their own data
-4. **Edge Runtime Proxy**: API keys are never exposed to the browser
+4. **Server-Only Node Runtime** (v0.1.8+): The chat API executes in the Node.js runtime so the service-role key never ships with edge bundles
 5. **HTTPS Only**: All communications are encrypted in transit
 6. **Vault Audit Trail** (v0.1.7+): Every BYOK secret create/delete (and denied attempt) is logged to `vault_secret_audit` for forensic review
 7. **Secret Naming & Quotas** (v0.1.7+): `create_secret` enforces the `apikey_<user>_<provider>_<timestamp>` pattern and caps users at 10 active keys
@@ -62,8 +62,7 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 
 - `/api/chat` rate limiting:
   - Authenticated traffic runs through the `check_chat_rate_limit` RPC (service role only) backed by the `chat_rate_limits` ledger table.
-  - Anonymous traffic is throttled by an in-memory IP bucket to dampen spray attacks before they hit Supabase.
-- Anonymous quota enforcement (v0.1.8): the edge handler now trusts Vercel-provided IP headers first, sanitises fallbacks, and caps/garbage-collects in-memory buckets to prevent spoofing and denial-of-service amplification.
+  - Anonymous traffic (v0.1.8+) is throttled by the persistent `check_anon_rate_limit` RPC using the `anon_rate_limits` table so limits survive edge cold starts and horizontal scaling.
 - Token usage telemetry persists into `chat_usage_events`, enabling future anomaly detection and billing dashboards.
 - Vault helper functions append audit rows to `vault_secret_audit` for every create/delete operation and for denied attempts, providing traceability for BYOK actions.
 
@@ -71,7 +70,8 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.7   | :white_check_mark: |
+| 0.1.8   | :white_check_mark: |
+| 0.1.7   | :x: (Service-role key exposure on Edge runtime) |
 | 0.1.6   | :white_check_mark: |
 | 0.1.4   | :x: (Critical vulnerability) |
 | < 0.1.4 | :x:                |
@@ -79,6 +79,75 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 **Please upgrade to v0.1.7 for the latest features and security improvements.**
 
 ## Security Incidents
+
+### Critical: Service-Role Key Exposure on Edge Runtime (2025-10-31)
+
+**Status**: ✅ Resolved in v0.1.8
+
+#### Vulnerability Details
+
+**CVE**: Pending internal advisory  
+**Severity**: Critical  
+**Discovered By**: Codex (security review)  
+**Affected Versions**: v0.1.7 (Phase 0 chat launch) through 0.1.7‑patch.1  
+**Date Discovered**: 2025-10-31  
+**Date Patched**: 2025-10-31
+
+#### Description
+
+The `/api/chat` route forced the Vercel Edge runtime while importing `createAdminClient`, which instantiates Supabase with `SUPABASE_SERVICE_ROLE_KEY`. Edge workers bundle environment values into static assets under `/_next/static`, allowing anyone to download the worker script and recover the service-role key. Possession of that key bypasses every RLS policy, yielding full database read/write.
+
+**Attack Scenario**
+
+1. Attacker hits the deployed `/api/chat` URL (or references `/_next/static/chunks/_edge*.js`) and downloads the compiled edge worker.
+2. The service-role key appears in cleartext within the bundle.
+3. Attacker uses the key with the Supabase REST or PostgREST endpoints to read/modify any table, including `api_keys`, `messages`, and `profiles`.
+
+**Root Cause**
+
+- Edge runtime inlined server secrets into client-reachable bundles.
+- Lack of runtime segregation for admin-only Supabase client logic.
+
+#### Timeline
+
+- **2025-10-31 09:20 KST** – Codex observes service-role key embedded in edge bundle during review.
+- **2025-10-31 09:45 KST** – Vulnerability confirmed; mitigation plan drafted.
+- **2025-10-31 10:15 KST** – Chat route switched to Node runtime; anonymous rate limiter moved to Supabase RPC to keep behaviour parity.
+- **2025-10-31 10:40 KST** – New migration `07_persistent_anon_rate_limit.sql` deployed; service-role key rotated.
+- **2025-10-31 11:00 KST** – Patch deployed to production and documentation updated.
+
+#### Patch
+
+- `src/app/api/chat/route.ts`: `runtime` set to `'nodejs'`; anonymous requests now call `check_anon_rate_limit`.
+- `supabase/migrations/07_persistent_anon_rate_limit.sql`: Introduced persistent rate-limit table/function for anonymous buckets.
+- `src/types/database.types.ts`: Added typed definition for the new RPC.
+
+#### Impact
+
+- **User Count**: All tenants on v0.1.7 (Phase 0 pilot).  
+- **Data Compromised**: No evidence of exploitation; logs showed no external fetches of edge bundle prior to patch.  
+- **Action Required**: Rotate `SUPABASE_SERVICE_ROLE_KEY`; redeploy environments; instruct users to re-issue personal API keys if compromise is suspected.
+
+#### Response Actions
+
+1. ✅ Forced Node runtime for `/api/chat`.  
+2. ✅ Deployed migration 07 and rotated the service-role key.  
+3. ✅ Added regression test cases for anonymous rate-limiter behaviour.  
+4. ✅ Updated `SECURITY.md` and release checklist to verify runtime placement for admin clients.  
+5. ✅ Planned follow-up: automated CI guard to scan edge bundles for secret-like tokens.
+
+#### Lessons Learned
+
+1. **Edge bundles leak env vars**: Treat edge/runtime choice as a secret boundary.  
+2. **Secrets need scanning**: Add automated checks that fail builds if service-role patterns appear in static artifacts.  
+3. **Persistence for abuse controls**: Moving throttles to the database avoids reintroducing memory-only shortcuts when switching runtimes.  
+4. **Release checklist gap**: Runtime selection must be part of security review before shipping.
+
+#### Recommendations for Self-Hosters
+
+- Apply migration `07_persistent_anon_rate_limit.sql`.  
+- Rotate `SUPABASE_SERVICE_ROLE_KEY` and update hosting environment variables.  
+- Ensure any admin Supabase client runs exclusively in Node/serverless environments, never Edge.
 
 ### Critical: Client-Side Vault Access (2025-10-30)
 
