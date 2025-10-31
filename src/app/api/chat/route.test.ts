@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
 
 const hoistedMocks = vi.hoisted(() => {
   const buildContextMock = vi.fn()
@@ -946,5 +948,18 @@ describe('POST /api/chat', () => {
     })
 
     expect(updateSummariesMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('Security: Runtime Configuration', () => {
+  it('must use nodejs runtime to prevent service-role key exposure', () => {
+    const routePath = resolve(__dirname, './route.ts')
+    const content = readFileSync(routePath, 'utf-8')
+
+    // Must use Node.js runtime
+    expect(content).toMatch(/export\s+const\s+runtime\s*=\s*['"]nodejs['"]/)
+
+    // Must NOT use Edge runtime (security vulnerability)
+    expect(content).not.toMatch(/export\s+const\s+runtime\s*=\s*['"]edge['"]/)
   })
 })

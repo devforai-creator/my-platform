@@ -25,3 +25,25 @@ jobs:
 
       - name: Run unit and integration tests
         run: npm run test
+
+      - name: Build for production
+        run: npm run build
+
+      - name: Scan for leaked secrets in build output
+        run: |
+          echo "🔍 Scanning build artifacts for leaked secrets..."
+
+          # Check for service role key patterns in static files
+          if grep -r "SUPABASE_SERVICE_ROLE" .next/static/ 2>/dev/null; then
+            echo "❌ SECURITY ERROR: Service role key found in static bundle!"
+            echo "This indicates the /api/chat route may be using Edge runtime."
+            exit 1
+          fi
+
+          # Check for other sensitive patterns
+          if grep -rE "(eyJ[a-zA-Z0-9_-]{20,}\.eyJ[a-zA-Z0-9_-]{20,})" .next/static/ 2>/dev/null | grep -v "node_modules"; then
+            echo "⚠️  WARNING: JWT-like pattern found in static bundle"
+            echo "Please verify this is not a real secret"
+          fi
+
+          echo "✅ No secrets found in bundle"

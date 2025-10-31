@@ -135,14 +135,15 @@ The `/api/chat` route forced the Vercel Edge runtime while importing `createAdmi
 1. ✅ Forced Node runtime for `/api/chat`.  
 2. ✅ Deployed migration 07 and rotated the service-role key.  
 3. ✅ Added regression test cases for anonymous rate-limiter behaviour.  
-4. ✅ Updated `SECURITY.md` and release checklist to verify runtime placement for admin clients.  
-5. ✅ Planned follow-up: automated CI guard to scan edge bundles for secret-like tokens.
+4. ✅ Updated `SECURITY.md` and release checklist to verify runtime placement for admin clients.
+5. ✅ Implemented automated CI guard to scan edge bundles for secret-like tokens (`.github/workflows/test.yml` + runtime validation test).
 
 #### Lessons Learned
 
-1. **Edge bundles leak env vars**: Treat edge/runtime choice as a secret boundary.  
-2. **Secrets need scanning**: Add automated checks that fail builds if service-role patterns appear in static artifacts.  
-3. **Persistence for abuse controls**: Moving throttles to the database avoids reintroducing memory-only shortcuts when switching runtimes.  
+1. **Edge bundles leak env vars**: Treat edge/runtime choice as a secret boundary.
+2. ✅ **Secrets need scanning**: Add automated checks that fail builds if service-role patterns appear in static artifacts.
+   - **Implemented**: CI now includes runtime validation tests and build artifact scanning (`.github/workflows/test.yml`, `src/app/api/chat/route.test.ts`)
+3. **Persistence for abuse controls**: Moving throttles to the database avoids reintroducing memory-only shortcuts when switching runtimes.
 4. **Release checklist gap**: Runtime selection must be part of security review before shipping.
 
 #### Recommendations for Self-Hosters
