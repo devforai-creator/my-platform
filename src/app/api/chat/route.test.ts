@@ -187,8 +187,11 @@ class SupabaseAdminMock {
   constructor(private readonly fixture: SupabaseFixture) {}
 
   readonly usageEvents: ChatUsageEventInsertRow[] = []
+  readonly rpcCalls: Array<{ name: string; params: Record<string, unknown> }> = []
 
   rpc(name: string, params: Record<string, unknown>) {
+    this.rpcCalls.push({ name, params })
+
     switch (name) {
       case 'check_anon_rate_limit': {
         if (this.fixture.anonRateLimit?.error) {
@@ -389,16 +392,25 @@ class MessagesTable {
 
 function createSupabaseMock(
   fixture: SupabaseFixture
-): SupabaseRouteMock & { adminUsageEvents: ChatUsageEventInsertRow[] } {
+): SupabaseRouteMock & {
+  adminUsageEvents: ChatUsageEventInsertRow[]
+  adminRpcCalls: Array<{ name: string; params: Record<string, unknown> }>
+} {
   const routeMock = new SupabaseRouteMock(fixture)
   const adminMock = new SupabaseAdminMock(fixture)
   createClientMock.mockReturnValue(routeMock)
   createAdminClientMock.mockReturnValue(adminMock)
   ;(routeMock as SupabaseRouteMock & {
     adminUsageEvents: ChatUsageEventInsertRow[]
+    adminRpcCalls: Array<{ name: string; params: Record<string, unknown> }>
   }).adminUsageEvents = adminMock.usageEvents
+  ;(routeMock as SupabaseRouteMock & {
+    adminUsageEvents: ChatUsageEventInsertRow[]
+    adminRpcCalls: Array<{ name: string; params: Record<string, unknown> }>
+  }).adminRpcCalls = adminMock.rpcCalls
   return routeMock as SupabaseRouteMock & {
     adminUsageEvents: ChatUsageEventInsertRow[]
+    adminRpcCalls: Array<{ name: string; params: Record<string, unknown> }>
   }
 }
 
@@ -456,6 +468,39 @@ describe('POST /api/chat', () => {
 
     const response = await POST(request)
     expect(response.status).toBe(401)
+  })
+
+  it('prefers the original client IP from forwarded headers for anonymous rate limiting', async () => {
+    const supabase = createSupabaseMock({
+      user: null,
+      apiKeys: [],
+      chats: [],
+      characters: [],
+      anonRateLimit: {
+        allowed: true,
+      },
+    })
+
+    const request = new Request('http://localhost/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        chatId: 'chat-anon',
+        apiKeyId: 'anon-key',
+        messages: [{ role: 'user', content: 'hello' }],
+      }),
+      headers: {
+        'x-real-ip': '10.0.0.8',
+        'x-forwarded-for': '198.51.100.5, 10.0.0.2',
+      },
+    })
+
+    await POST(request)
+
+    const rateLimitCall = supabase.adminRpcCalls.find(
+      (call) => call.name === 'check_anon_rate_limit'
+    )
+
+    expect(rateLimitCall?.params.identifier).toBe('198.51.100.5')
   })
 
   it('returns 429 when anonymous rate limit is exceeded', async () => {

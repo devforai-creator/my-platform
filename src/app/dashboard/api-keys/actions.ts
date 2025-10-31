@@ -52,7 +52,9 @@ export async function createApiKey(formData: FormData) {
       }
     }
 
-    return { error: 'API 키 암호화 저장 실패: ' + vaultError.message }
+    return {
+      error: 'API 키 암호화 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+    }
   }
 
   // 메타데이터를 api_keys 테이블에 저장
@@ -67,7 +69,9 @@ export async function createApiKey(formData: FormData) {
   if (error) {
     // 실패 시 Vault에서도 삭제
     await supabase.rpc('delete_secret', { secret_name: vaultSecretName })
-    return { error: 'API 키 등록 실패: ' + error.message }
+    return {
+      error: 'API 키 등록 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+    }
   }
 
   revalidatePath('/dashboard/api-keys')
@@ -104,7 +108,9 @@ export async function deleteApiKey(id: string) {
     .eq('user_id', user.id)
 
   if (error) {
-    return { error: 'API 키 삭제 실패: ' + error.message }
+    return {
+      error: 'API 키 삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+    }
   }
 
   // Vault에서도 삭제
@@ -149,7 +155,9 @@ export async function toggleApiKey(id: string, isActive: boolean) {
     .eq('user_id', user.id)
 
   if (error) {
-    return { error: '상태 변경 실패: ' + error.message }
+    return {
+      error: '상태 변경 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+    }
   }
 
   revalidatePath('/dashboard/api-keys')

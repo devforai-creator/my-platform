@@ -62,7 +62,8 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 
 - `/api/chat` rate limiting:
   - Authenticated traffic runs through the `check_chat_rate_limit` RPC (service role only) backed by the `chat_rate_limits` ledger table.
-  - Anonymous traffic (v0.1.8+) is throttled by the persistent `check_anon_rate_limit` RPC using the `anon_rate_limits` table so limits survive edge cold starts and horizontal scaling.
+  - Anonymous traffic (v0.1.8+) is throttled by the persistent `check_anon_rate_limit` RPC using the `anon_rate_limits` table so limits survive cold starts and horizontal scaling.
+  - Normalized client fingerprints (v0.1.9+) prefer the left-most public IP from `X-Forwarded-For`, falling back to a hashed user-agent so abusive clients cannot hide behind shared edges.
 - Token usage telemetry persists into `chat_usage_events`, enabling future anomaly detection and billing dashboards.
 - Vault helper functions append audit rows to `vault_secret_audit` for every create/delete operation and for denied attempts, providing traceability for BYOK actions.
 
@@ -70,13 +71,14 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.8   | :white_check_mark: |
+| 0.1.9   | :white_check_mark: |
+| 0.1.8   | :x: (Anonymous rate-limit collisions on shared edge IPs) |
 | 0.1.7   | :x: (Service-role key exposure on Edge runtime) |
 | 0.1.6   | :x: (Service-role key exposure on Edge runtime) |
 | 0.1.4   | :x: (Critical vulnerability) |
 | < 0.1.4 | :x:                |
 
-**Please upgrade to v0.1.8 for the latest features and security improvements.**
+**Please upgrade to v0.1.9 for the latest security improvements.**
 
 ## Security Incidents
 
@@ -370,4 +372,4 @@ We believe in transparent security practices:
 
 ---
 
-**Last Updated**: 2025-10-31 (v0.1.8)
+**Last Updated**: 2025-10-31 (v0.1.9)

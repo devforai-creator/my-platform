@@ -10,6 +10,7 @@ import {
 } from '@/lib/chat-summaries'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Database } from '@/types/database.types'
+import { createHash } from 'node:crypto'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60 // 60초 타임아웃
@@ -548,38 +549,48 @@ function buildContentFilterMessage(provider: string, categories: string[]): stri
 }
 
 function extractClientIdentifier(req: Request): string {
-  const candidates: Array<string | null> = [
-    req.headers.get('x-vercel-ip'),
+  const forwardedFor = req.headers.get('x-forwarded-for')
+
+  const candidates = [
     req.headers.get('x-real-ip'),
-    getLastIpFromForwardedFor(req.headers.get('x-forwarded-for')),
+    req.headers.get('x-vercel-ip'),
     req.headers.get('cf-connecting-ip'),
+    ...getForwardedForClientIps(forwardedFor),
   ]
+
+  let firstValidIp: string | null = null
 
   for (const candidate of candidates) {
     const normalized = normalizePotentialIp(candidate)
-    if (normalized) {
+    if (!normalized) {
+      continue
+    }
+
+    if (!firstValidIp) {
+      firstValidIp = normalized
+    }
+
+    if (!isPrivateIp(normalized)) {
       return normalized
     }
   }
 
-  return 'unknown'
-}
-
-function getLastIpFromForwardedFor(headerValue: string | null): string | null {
-  if (!headerValue) {
-    return null
+  if (firstValidIp) {
+    return firstValidIp
   }
 
-  const segments = headerValue
+  return buildHashedUserAgentIdentifier(req)
+}
+
+function getForwardedForClientIps(headerValue: string | null): string[] {
+  if (!headerValue) {
+    return []
+  }
+
+  return headerValue
     .split(',')
     .map((segment) => segment.trim())
     .filter(Boolean)
-
-  if (segments.length === 0) {
-    return null
-  }
-
-  return segments[segments.length - 1] ?? null
 }
 
 function normalizePotentialIp(candidate: string | null): string | null {
@@ -600,4 +611,58 @@ function normalizePotentialIp(candidate: string | null): string | null {
   }
   const truncated = trimmed.slice(0, MAX_ANON_RATE_LIMIT_IDENTIFIER_LENGTH)
   return truncated
+}
+
+function isPrivateIp(candidate: string): boolean {
+  const lower = candidate.toLowerCase()
+
+  if (lower === '::1') {
+    return true
+  }
+
+  if (lower.startsWith('fc') || lower.startsWith('fd')) {
+    return true
+  }
+
+  if (lower.startsWith('fe80') || lower.startsWith('fec0')) {
+    return true
+  }
+
+  if (lower.startsWith('::ffff:')) {
+    const mappedIpv4 = lower.slice(lower.lastIndexOf(':') + 1)
+    return isPrivateIpv4(mappedIpv4)
+  }
+
+  if (!candidate.includes(':')) {
+    return isPrivateIpv4(candidate)
+  }
+
+  return false
+}
+
+function isPrivateIpv4(candidate: string): boolean {
+  const ipv4Pattern =
+    /^(?:\d{1,3}\.){3}\d{1,3}$/
+
+  if (!ipv4Pattern.test(candidate)) {
+    return false
+  }
+
+  const parts = candidate.split('.').map(Number)
+  const [first, second] = parts
+
+  if (first === 10) return true
+  if (first === 127) return true
+  if (first === 192 && second === 168) return true
+  if (first === 169 && second === 254) return true
+  if (first === 172 && second >= 16 && second <= 31) return true
+
+  return false
+}
+
+function buildHashedUserAgentIdentifier(req: Request): string {
+  const userAgent = req.headers.get('user-agent') ?? 'unknown'
+  const hash = createHash('sha256').update(userAgent).digest('hex').slice(0, 48)
+  const identifier = `ua:${hash}`
+  return identifier.slice(0, MAX_ANON_RATE_LIMIT_IDENTIFIER_LENGTH)
 }

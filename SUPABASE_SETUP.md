@@ -33,7 +33,7 @@ Phase 0 MVP를 위한 Supabase 데이터베이스 설정 가이드입니다.
 3. SQL Editor에 붙여넣기
 4. 우측 하단 **"Run"** 버튼 클릭 (또는 Cmd/Ctrl + Enter)
 5. 성공 메시지 확인: "Success. No rows returned"
-6. 이후 `01_vault_helpers.sql` → `02_update_vault_delete_secret.sql` → `03_chat_summaries.sql` → `04_secure_get_decrypted_secret.sql` → `05_allow_starter_characters.sql` → `06_rate_limit_and_vault_audit.sql` → `07_persistent_anon_rate_limit.sql` 순서로 반복 실행하여 최신 보안/기능 스키마를 모두 적용합니다. (v0.1.8 이상에서는 07번 파일까지 필수입니다.)
+6. 이후 `01_vault_helpers.sql` → `02_update_vault_delete_secret.sql` → `03_chat_summaries.sql` → `04_secure_get_decrypted_secret.sql` → `05_allow_starter_characters.sql` → `06_rate_limit_and_vault_audit.sql` → `07_persistent_anon_rate_limit.sql` 순서로 반복 실행하여 최신 보안/기능 스키마를 모두 적용합니다. (v0.1.9 이상에서는 07번 파일까지 필수입니다.)
 
 ### 2-3. 테이블 생성 확인
 1. 왼쪽 메뉴에서 **"Table Editor"** 클릭

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9] - 2025-10-31
+
+### Security
+- Anonymous rate limiting now prefers the originating public IP (with a hashed user-agent fallback), keeping abusive traffic from hiding behind edge network addresses.
+- API 키 등록/삭제/토글 server actions no longer expose raw database or Vault error strings to end users.
+
+### Testing
+- Added regression coverage to ensure `/api/chat` forwards the normalized client identifier into `check_anon_rate_limit`.
+
 ## [0.1.8] - 2025-10-31
 
 ### Security
