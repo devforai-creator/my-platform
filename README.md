@@ -66,7 +66,7 @@
 
 ### Deployment
 - **Platform**: Vercel
-- **Runtime**: Edge Runtime (60s timeout)
+- **Runtime**: Node.js Runtime (60s timeout)
 - **CI/CD**: GitHub Integration
 
 ## 지원 모델 (2025년 10월 기준)
@@ -173,7 +173,7 @@ my_characterchat_platform/
 │   │   │   ├── characters/       # 캐릭터 관리
 │   │   │   └── chats/            # 채팅
 │   │   └── api/
-│   │       └── chat/             # 채팅 API (Edge Runtime)
+│   │       └── chat/             # 채팅 API (Node.js Runtime)
 │   ├── lib/
 │   │   └── supabase/             # Supabase 클라이언트
 │   │       ├── client.ts         # 브라우저용
@@ -223,7 +223,7 @@ GitHub Actions가 모든 푸시와 PR에서 위 테스트를 자동으로 실행
 - **Row Level Security (RLS)**: 모든 테이블에 적용
 - **Supabase Vault**: API 키 암호화 저장
 - **Service-role 전용 복호화** (v0.1.5): 브라우저에서 Vault 직접 접근 차단, XSS 공격 방어
-- **Edge Runtime Proxy**: 클라이언트에 API 키 노출 방지
+- **Server-Side Proxy**: 클라이언트에 API 키 노출 방지 (Node.js Runtime)
 - **Admin Client**: 서버 전용 Supabase 클라이언트로 민감한 작업 처리
 
 상세 스키마는 `supabase/migrations/` 참조
@@ -291,7 +291,7 @@ GitHub에 push하면 자동으로 Vercel에 배포됩니다.
 - API 키는 등록 즉시 **Supabase Vault**로 암호화되어 저장됩니다
 - 데이터베이스를 직접 확인해도 암호화된 덩어리만 보입니다
 - **v0.1.5 보안 강화**: 복호화는 오직 `service_role`만 가능, 브라우저에서 절대 접근 불가
-- 채팅할 때만 Edge Runtime(서버)에서 순간적으로 복호화하고 즉시 폐기됩니다
+- 채팅할 때만 서버에서 순간적으로 복호화하고 즉시 폐기됩니다 (Node.js Runtime)
 - 증거 코드: [`supabase/migrations/04_secure_get_decrypted_secret.sql`](./supabase/migrations/04_secure_get_decrypted_secret.sql)
 
 #### 2. **GitHub-Vercel 자동 배포**
@@ -316,7 +316,7 @@ GitHub에 push하면 자동으로 Vercel에 배포됩니다.
 - ✅ Supabase Vault 암호화 저장
 - ✅ Service-role 전용 복호화 (v0.1.5 - XSS 공격 차단)
 - ✅ Row Level Security로 사용자 격리
-- ✅ Edge Runtime 프록시로 클라이언트 노출 방지
+- ✅ 서버 프록시로 클라이언트 노출 방지 (Node.js Runtime)
 - ✅ HTTPS 통신
 
 ### 인증

@@ -43,8 +43,10 @@ Copy `.env.example` to `.env.local` and supply Supabase plus AI provider keys.
 - For database provisioning, follow `SUPABASE_SETUP.md` and document new tables there.
 
 ## Agent Coordination
-Two AI agents contribute here: Codex (CLI-based; primary for code edits) and Claude (parallel terminal; often analyzing architectural trade-offs).  
-- Announce ownership of ongoing tasks in the shared channel to avoid duplicate patches.  
-- Codex should prioritize implementation details and lint fixes; Claude can focus on reviews, high-level strategy, or documentation when Codex is mid-change.  
+Two AI agents contribute here: **Claude Code** (primary development assistant via claude.ai/code) and **Codex** (specialized security reviewer and code quality analyzer).
+- **Claude Code**: Handles code generation, architecture guidance, feature development, and general development tasks.
+- **Codex**: Focuses on security reviews (especially before deployment), automated fixes, and critical security patches.
+- Announce ownership of ongoing tasks in the shared channel to avoid duplicate patches.
 - When both touch the same feature, pin the source of truth (`main` branch or a shared PR) before handing off to prevent drift.
+- **Deployment workflow**: Claude Code implements features → `npm run lint` + `npm run test` → Codex security review → deploy
 - Keep the CI badge green: if a PR breaks lint/tests, coordinate quickly to unblock deployment announcements.

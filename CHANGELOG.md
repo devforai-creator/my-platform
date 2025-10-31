@@ -282,7 +282,7 @@ Phase 0 MVP 완성! BYOK 기반 캐릭터 채팅 플랫폼의 핵심 기능이 �
 
 #### AI & LLM 통합
 - Vercel AI SDK v3.4.33 통합
-- Edge Runtime API 라우트 (`/api/chat`)
+- Node.js Runtime API 라우트 (`/api/chat`)
 - 60초 maxDuration 설정
 - Provider별 모델 인스턴스 생성:
   - `createGoogleGenerativeAI` (Gemini 2.5)
@@ -331,7 +331,7 @@ Phase 0 MVP 완성! BYOK 기반 캐릭터 채팅 플랫폼의 핵심 기능이 �
   - @ai-sdk/anthropic@0.0.56
 
 #### Architecture
-- **Runtime**: Edge Runtime for chat API
+- **Runtime**: Node.js Runtime for chat API
 - **Auth**: Supabase Auth with JWT
 - **Secret Management**: Supabase Vault
 - **API Proxy**: Server-side to protect API keys
@@ -341,7 +341,7 @@ Phase 0 MVP 완성! BYOK 기반 캐릭터 채팅 플랫폼의 핵심 기능이 �
 - ✅ API 키 Vault 암호화 저장
 - ✅ Row Level Security (RLS) 전체 테이블
 - ✅ 인증 미들웨어
-- ✅ Edge Runtime 프록시
+- ✅ 서버 프록시 (Node.js Runtime)
 - ✅ HTTPS 통신
 
 ### Documentation

@@ -46,7 +46,7 @@ When reviewing code or making changes, be aware that both agents may have contri
 
 ## Project Overview
 
-CharacterChat Platform - A BYOK (Bring Your Own Key) character chat platform built with Next.js 15, Supabase, and Vercel AI SDK. Users register their own API keys (Google, OpenAI, Anthropic) to chat with custom AI characters. Currently at Phase 0 (v0.1.5).
+CharacterChat Platform - A BYOK (Bring Your Own Key) character chat platform built with Next.js 15, Supabase, and Vercel AI SDK. Users register their own API keys (Google, OpenAI, Anthropic) to chat with custom AI characters. Currently at Phase 0 (v0.1.9).
 
 ## Development Commands
 
@@ -85,7 +85,7 @@ npx tsc --noEmit     # Type check without building
 3. `api_keys` table only stores `vault_secret_name` reference
 4. **Client never sees `vault_secret_name`** - server looks it up by API key ID
 5. **Service-role ONLY decryption**: `get_decrypted_secret` RPC is restricted to `service_role`, preventing browser-based exfiltration (XSS, malicious extensions)
-6. Edge Runtime API route (`/api/chat/route.ts`) uses admin client (`src/lib/supabase/admin.ts`) to decrypt keys
+6. Node.js Runtime API route (`/api/chat/route.ts`) uses admin client (`src/lib/supabase/admin.ts`) to decrypt keys
 7. **Vault RPCs verify explicit `requester` parameter** for ownership validation
 
 **Security Improvement (v0.1.5)**:
@@ -112,7 +112,7 @@ await supabase.from('api_keys').insert({
 
 **Retrieving API Keys** (v0.1.5+):
 ```typescript
-// ONLY on Edge Runtime server with admin client
+// ONLY on Node.js Runtime server with admin client
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const adminSupabase = createAdminClient()  // Uses SERVICE_ROLE_KEY
@@ -126,11 +126,11 @@ const { data: secretData } = await adminSupabase.rpc('get_decrypted_secret', {
 
 **Message Flow** (v0.1.2+):
 1. User types message in `ChatInterface.tsx` (Client Component)
-2. Client calls `/api/chat` Edge Runtime route with:
+2. Client calls `/api/chat` Node.js Runtime route with:
    - `messages[]`: Chat history
    - `chatId`: Current chat session
    - `apiKeyId`: Which API key to use
-3. Edge Runtime:
+3. Server (Node.js Runtime):
    - **Validates request input** (400 if malformed)
    - Verifies user authentication
    - **Loads chat and uses its `character_id`** (not client-provided)
@@ -209,7 +209,7 @@ src/app/
 │           └── ChatInterface.tsx  # Client component with useChat()
 └── api/
     └── chat/
-        └── route.ts            # Edge Runtime - streaming chat endpoint
+        └── route.ts            # Node.js Runtime - streaming chat endpoint
 ```
 
 **Pattern**: Server Actions in `actions.ts`, Client Components separate, Page components fetch initial data
@@ -223,7 +223,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=  # Public anon key
 SUPABASE_SERVICE_ROLE_KEY=      # Service role key (NEVER expose to client)
 ```
 
-**Note**: Service role key is ONLY used in Edge Runtime routes (server-side)
+**Note**: Service role key is ONLY used in Node.js Runtime routes (server-side)
 
 ## Common Development Patterns
 
@@ -336,7 +336,7 @@ See ROADMAP.md for planned features in v0.2.0+
 
 ## Important Constraints
 
-- **Edge Runtime Timeout**: `/api/chat/route.ts` has 60s max duration (Vercel limit)
+- **Node.js Runtime Timeout**: `/api/chat/route.ts` has 60s max duration (Vercel limit)
 - **TypeScript Strict Mode**: Enabled in tsconfig.json
 - **Next.js 15 Patterns**: Uses App Router, async Server Components, React 19
 - **Supabase SSR**: Must use `@supabase/ssr` package (not `@supabase/supabase-js` directly)
@@ -346,14 +346,22 @@ See ROADMAP.md for planned features in v0.2.0+
 **Vercel** (current deployment):
 - Environment variables must be set in Vercel Dashboard
 - GitHub integration for automatic deploys on push
-- Edge Runtime enabled for `/api/chat`
+- Node.js Runtime for `/api/chat` (service-role key security)
 
 ## Testing & Verification
 
-No automated tests yet. Manual verification:
+### Automated Tests
+- `npm run test`: Vitest-based unit and integration tests
+  - `src/lib/chat-summaries.integration.test.ts`: Hierarchical summarization pipeline verification
+  - `src/app/api/chat/route.test.ts`: Chat endpoint ownership enforcement and summary queue triggering
+- `CI=1 npm run lint`: ESLint checks (run at least once before deployment)
+- GitHub Actions automatically runs tests on all pushes and PRs
+
+### Manual Smoke Checks
 1. `npm run build` - Check for TypeScript errors
 2. Test authentication flow (signup → login → logout)
 3. Add API key and verify Vault storage
-4. Create character and start chat
+4. Create character and start chat (20+ turns to verify summarization)
 5. Verify streaming responses work
 6. Check messages saved to database with token counts
+7. Confirm token statistics update in real-time
