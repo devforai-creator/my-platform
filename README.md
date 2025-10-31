@@ -1,6 +1,6 @@
 # CharacterChat Platform
 
-**Phase 0 (v0.1.7)** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
+**Phase 0 (v0.1.8)** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
 
 [![Deploy Status](https://img.shields.io/badge/deploy-success-brightgreen)](https://mycharacterchatplatform.vercel.app)
 [![CI](https://github.com/devforai-creator/my-platform/actions/workflows/test.yml/badge.svg)](https://github.com/devforai-creator/my-platform/actions/workflows/test.yml)

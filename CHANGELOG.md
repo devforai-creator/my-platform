@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2025-10-31
+
+### Security
+- `/api/chat` runs on the Node.js runtime again, preventing `SUPABASE_SERVICE_ROLE_KEY` from being bundled inside edge workers and eliminating full-database takeover risk.
+- Anonymous chat traffic is throttled through the new `check_anon_rate_limit` Supabase RPC, persisting counters in `anon_rate_limits` so quotas hold across cold starts and regions.
+
+### Tooling
+- Added migration `07_persistent_anon_rate_limit.sql` and typed RPC definition to keep database schema aligned with the new limiter.
+- Documented the service-role leak postmortem in `SECURITY.md`, including operational guidance for self-hosters.
+
+### Migration Required
+⚠️ **MUST RUN** `supabase/migrations/07_persistent_anon_rate_limit.sql` and rotate `SUPABASE_SERVICE_ROLE_KEY` after deploying this release.
+
 ## [0.1.7] - 2025-10-31
 
 ### Security

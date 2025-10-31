@@ -76,7 +76,7 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 | 0.1.4   | :x: (Critical vulnerability) |
 | < 0.1.4 | :x:                |
 
-**Please upgrade to v0.1.7 for the latest features and security improvements.**
+**Please upgrade to v0.1.8 for the latest features and security improvements.**
 
 ## Security Incidents
 
@@ -370,4 +370,4 @@ We believe in transparent security practices:
 
 ---
 
-**Last Updated**: 2025-10-31 (v0.1.7)
+**Last Updated**: 2025-10-31 (v0.1.8)
