@@ -72,7 +72,7 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 | ------- | ------------------ |
 | 0.1.8   | :white_check_mark: |
 | 0.1.7   | :x: (Service-role key exposure on Edge runtime) |
-| 0.1.6   | :white_check_mark: |
+| 0.1.6   | :x: (Service-role key exposure on Edge runtime) |
 | 0.1.4   | :x: (Critical vulnerability) |
 | < 0.1.4 | :x:                |
 
@@ -89,7 +89,7 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 **CVE**: Pending internal advisory  
 **Severity**: Critical  
 **Discovered By**: Codex (security review)  
-**Affected Versions**: v0.1.7 (Phase 0 chat launch) through 0.1.7‑patch.1  
+**Affected Versions**: v0.1.6 – v0.1.7  
 **Date Discovered**: 2025-10-31  
 **Date Patched**: 2025-10-31
 
@@ -124,7 +124,7 @@ The `/api/chat` route forced the Vercel Edge runtime while importing `createAdmi
 
 #### Impact
 
-- **User Count**: All tenants on v0.1.7 (Phase 0 pilot).  
+- **User Count**: All tenants on v0.1.6–v0.1.7 (Phase 0 pilot).  
 - **Data Compromised**: No evidence of exploitation; logs showed no external fetches of edge bundle prior to patch.  
 - **Action Required**: Rotate `SUPABASE_SERVICE_ROLE_KEY`; redeploy environments; instruct users to re-issue personal API keys if compromise is suspected.
 
