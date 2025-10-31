@@ -136,12 +136,17 @@ interface ChatUsageEventInsertRow {
 }
 
 interface SupabaseFixture {
-  user: { id: string }
+  user: { id: string } | null
   apiKeys: ApiKeyRow[]
   chats: ChatRow[]
   characters: CharacterRow[]
   decryptedSecret?: string
   rateLimit?: {
+    allowed: boolean
+    retryAfter?: number
+    error?: { message: string; code?: string | null }
+  }
+  anonRateLimit?: {
     allowed: boolean
     retryAfter?: number
     error?: { message: string; code?: string | null }
@@ -185,9 +190,33 @@ class SupabaseAdminMock {
 
   rpc(name: string, params: Record<string, unknown>) {
     switch (name) {
+      case 'check_anon_rate_limit': {
+        if (this.fixture.anonRateLimit?.error) {
+          return Promise.resolve({
+            data: null,
+            error: this.fixture.anonRateLimit.error,
+          })
+        }
+
+        const allowed = this.fixture.anonRateLimit?.allowed ?? true
+        const retryAfter = this.fixture.anonRateLimit?.retryAfter ?? 0
+        const remaining = allowed ? 1 : 0
+
+        return Promise.resolve({
+          data: [
+            {
+              allowed,
+              remaining,
+              retry_after: retryAfter,
+            },
+          ],
+          error: null,
+        })
+      }
       case 'get_decrypted_secret': {
         const requester = params.requester
-        if (requester !== this.fixture.user.id) {
+        const expectedUserId = this.fixture.user?.id
+        if (!expectedUserId || requester !== expectedUserId) {
           return Promise.resolve({
             data: null,
             error: { message: 'Not authorized' },
@@ -403,6 +432,86 @@ describe('POST /api/chat', () => {
         },
       }
     })
+  })
+
+  it('returns 401 for anonymous users when the rate limit allows the request', async () => {
+    createSupabaseMock({
+      user: null,
+      apiKeys: [],
+      chats: [],
+      characters: [],
+      anonRateLimit: {
+        allowed: true,
+      },
+    })
+
+    const request = new Request('http://localhost/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        chatId: 'chat-anon',
+        apiKeyId: 'anon-key',
+        messages: [{ role: 'user', content: 'hello' }],
+      }),
+    })
+
+    const response = await POST(request)
+    expect(response.status).toBe(401)
+  })
+
+  it('returns 429 when anonymous rate limit is exceeded', async () => {
+    createSupabaseMock({
+      user: null,
+      apiKeys: [],
+      chats: [],
+      characters: [],
+      anonRateLimit: {
+        allowed: false,
+        retryAfter: 17,
+      },
+    })
+
+    const request = new Request('http://localhost/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        chatId: 'chat-anon',
+        apiKeyId: 'anon-key',
+        messages: [{ role: 'user', content: 'hello' }],
+      }),
+    })
+
+    const response = await POST(request)
+    expect(response.status).toBe(429)
+    expect(response.headers.get('Retry-After')).toBe('17')
+    const payload = await response.json()
+    expect(payload).toMatchObject({
+      error: 'Too many requests',
+      retryAfter: 17,
+    })
+  })
+
+  it('returns 500 when anonymous rate limiter RPC fails', async () => {
+    createSupabaseMock({
+      user: null,
+      apiKeys: [],
+      chats: [],
+      characters: [],
+      anonRateLimit: {
+        allowed: true,
+        error: { message: 'db down', code: 'XX001' },
+      },
+    })
+
+    const request = new Request('http://localhost/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        chatId: 'chat-anon',
+        apiKeyId: 'anon-key',
+        messages: [{ role: 'user', content: 'hello' }],
+      }),
+    })
+
+    const response = await POST(request)
+    expect(response.status).toBe(500)
   })
 
   it('enforces chat ownership and returns 404 when chat is missing', async () => {

@@ -11,20 +11,16 @@ import {
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Database } from '@/types/database.types'
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 export const maxDuration = 60 // 60초 타임아웃
 
 const MAX_MESSAGES_PER_REQUEST = 20
 const MAX_MESSAGE_BYTES = 2_048
 const USER_RATE_LIMIT_WINDOW_SECONDS = 60
 const USER_RATE_LIMIT_MAX_REQUESTS = 30
-const ANON_RATE_LIMIT_WINDOW_MS = 60_000
+const ANON_RATE_LIMIT_WINDOW_SECONDS = 60
 const ANON_RATE_LIMIT_MAX_REQUESTS = 10
-const MAX_ANON_RATE_LIMIT_BUCKETS = 5_000
-
-type AnonBucket = { count: number; expiresAt: number }
-
-const anonRateLimitBuckets = new Map<string, AnonBucket>()
+const MAX_ANON_RATE_LIMIT_IDENTIFIER_LENGTH = 256
 
 export async function POST(req: Request) {
   try {
@@ -99,17 +95,53 @@ export async function POST(req: Request) {
 
     if (!user) {
       const clientIdentifier = extractClientIdentifier(req)
-      const anonLimit = applyAnonRateLimit(clientIdentifier)
+      const anonLimitArgs = {
+        identifier: clientIdentifier,
+        window_seconds: ANON_RATE_LIMIT_WINDOW_SECONDS,
+        max_requests: ANON_RATE_LIMIT_MAX_REQUESTS,
+      } satisfies Database['public']['Functions']['check_anon_rate_limit']['Args']
 
-      if (!anonLimit.allowed) {
+      const anonLimitResult = await adminSupabase.rpc(
+        'check_anon_rate_limit',
+        anonLimitArgs as never
+      )
+
+      if (anonLimitResult.error) {
+        console.error('[Chat API] Anonymous rate limit RPC failed', {
+          code: anonLimitResult.error.code ?? null,
+        })
+        return new Response('Internal server error', { status: 500 })
+      }
+
+      type AnonRateLimitRow = {
+        allowed: boolean | null
+        remaining: number | null
+        retry_after: number | null
+      }
+
+      const anonLimitPayload: AnonRateLimitRow | null = Array.isArray(anonLimitResult.data)
+        ? ((anonLimitResult.data[0] as AnonRateLimitRow | undefined) ?? null)
+        : null
+
+      const anonLimitAllowed = anonLimitPayload?.allowed ?? false
+
+      if (!anonLimitAllowed) {
+        const retryAfter =
+          typeof anonLimitPayload?.retry_after === 'number'
+            ? Math.max(1, anonLimitPayload.retry_after)
+            : ANON_RATE_LIMIT_WINDOW_SECONDS
+
         return new Response(
           JSON.stringify({
             error: 'Too many requests',
-            retryAfter: anonLimit.retryAfter,
+            retryAfter,
           }),
           {
             status: 429,
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Retry-After': String(retryAfter),
+            },
           }
         )
       }
@@ -566,64 +598,6 @@ function normalizePotentialIp(candidate: string | null): string | null {
   if (!ipLikePattern.test(trimmed)) {
     return null
   }
-
-  return trimmed.slice(0, 128)
-}
-
-function cleanupExpiredAnonBuckets(now: number) {
-  for (const [key, bucket] of anonRateLimitBuckets) {
-    if (bucket.expiresAt <= now) {
-      anonRateLimitBuckets.delete(key)
-    }
-  }
-}
-
-function ensureAnonBucketCapacity(targetKey: string) {
-  if (anonRateLimitBuckets.size < MAX_ANON_RATE_LIMIT_BUCKETS) {
-    return
-  }
-
-  for (const key of anonRateLimitBuckets.keys()) {
-    if (key === targetKey) {
-      continue
-    }
-    anonRateLimitBuckets.delete(key)
-    if (anonRateLimitBuckets.size < MAX_ANON_RATE_LIMIT_BUCKETS) {
-      return
-    }
-  }
-}
-
-function applyAnonRateLimit(identifier: string): {
-  allowed: boolean
-  retryAfter: number
-} {
-  const now = Date.now()
-
-  cleanupExpiredAnonBuckets(now)
-
-  let bucket = anonRateLimitBuckets.get(identifier)
-
-  if (!bucket || bucket.expiresAt <= now) {
-    if (!bucket) {
-      ensureAnonBucketCapacity(identifier)
-    }
-
-    bucket = {
-      count: 0,
-      expiresAt: now + ANON_RATE_LIMIT_WINDOW_MS,
-    }
-    anonRateLimitBuckets.set(identifier, bucket)
-  }
-
-  if (bucket.count >= ANON_RATE_LIMIT_MAX_REQUESTS) {
-    const retryAfter = Math.ceil((bucket.expiresAt - now) / 1000)
-    return {
-      allowed: false,
-      retryAfter: Math.max(retryAfter, 1),
-    }
-  }
-
-  bucket.count += 1
-  return { allowed: true, retryAfter: 0 }
+  const truncated = trimmed.slice(0, MAX_ANON_RATE_LIMIT_IDENTIFIER_LENGTH)
+  return truncated
 }

@@ -321,6 +321,18 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
+      check_anon_rate_limit: {
+        Args: {
+          identifier: string
+          window_seconds: number
+          max_requests: number
+        }
+        Returns: Array<{
+          allowed: boolean | null
+          remaining: number | null
+          retry_after: number | null
+        }>
+      }
       check_chat_rate_limit: {
         Args: {
           target_user_id: string
