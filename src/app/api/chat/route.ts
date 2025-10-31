@@ -20,6 +20,7 @@ const USER_RATE_LIMIT_WINDOW_SECONDS = 60
 const USER_RATE_LIMIT_MAX_REQUESTS = 30
 const ANON_RATE_LIMIT_WINDOW_MS = 60_000
 const ANON_RATE_LIMIT_MAX_REQUESTS = 10
+const MAX_ANON_RATE_LIMIT_BUCKETS = 5_000
 
 type AnonBucket = { count: number; expiresAt: number }
 
@@ -515,20 +516,82 @@ function buildContentFilterMessage(provider: string, categories: string[]): stri
 }
 
 function extractClientIdentifier(req: Request): string {
-  const forwarded = req.headers.get('x-forwarded-for')
-  if (forwarded) {
-    const candidate = forwarded.split(',')[0]?.trim()
-    if (candidate) {
-      return candidate
+  const candidates: Array<string | null> = [
+    req.headers.get('x-vercel-ip'),
+    req.headers.get('x-real-ip'),
+    getLastIpFromForwardedFor(req.headers.get('x-forwarded-for')),
+    req.headers.get('cf-connecting-ip'),
+  ]
+
+  for (const candidate of candidates) {
+    const normalized = normalizePotentialIp(candidate)
+    if (normalized) {
+      return normalized
     }
   }
 
-  const cfIp = req.headers.get('cf-connecting-ip')
-  if (cfIp) {
-    return cfIp
+  return 'unknown'
+}
+
+function getLastIpFromForwardedFor(headerValue: string | null): string | null {
+  if (!headerValue) {
+    return null
   }
 
-  return 'unknown'
+  const segments = headerValue
+    .split(',')
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+
+  if (segments.length === 0) {
+    return null
+  }
+
+  return segments[segments.length - 1] ?? null
+}
+
+function normalizePotentialIp(candidate: string | null): string | null {
+  if (!candidate) {
+    return null
+  }
+
+  const trimmed = candidate.trim()
+
+  if (!trimmed) {
+    return null
+  }
+
+  // IPv4, IPv6, and IPv6-mapped IPv4 addresses
+  const ipLikePattern = /^[0-9a-fA-F:.]+$/
+  if (!ipLikePattern.test(trimmed)) {
+    return null
+  }
+
+  return trimmed.slice(0, 128)
+}
+
+function cleanupExpiredAnonBuckets(now: number) {
+  for (const [key, bucket] of anonRateLimitBuckets) {
+    if (bucket.expiresAt <= now) {
+      anonRateLimitBuckets.delete(key)
+    }
+  }
+}
+
+function ensureAnonBucketCapacity(targetKey: string) {
+  if (anonRateLimitBuckets.size < MAX_ANON_RATE_LIMIT_BUCKETS) {
+    return
+  }
+
+  for (const key of anonRateLimitBuckets.keys()) {
+    if (key === targetKey) {
+      continue
+    }
+    anonRateLimitBuckets.delete(key)
+    if (anonRateLimitBuckets.size < MAX_ANON_RATE_LIMIT_BUCKETS) {
+      return
+    }
+  }
 }
 
 function applyAnonRateLimit(identifier: string): {
@@ -536,14 +599,21 @@ function applyAnonRateLimit(identifier: string): {
   retryAfter: number
 } {
   const now = Date.now()
-  const bucket = anonRateLimitBuckets.get(identifier)
+
+  cleanupExpiredAnonBuckets(now)
+
+  let bucket = anonRateLimitBuckets.get(identifier)
 
   if (!bucket || bucket.expiresAt <= now) {
-    anonRateLimitBuckets.set(identifier, {
-      count: 1,
+    if (!bucket) {
+      ensureAnonBucketCapacity(identifier)
+    }
+
+    bucket = {
+      count: 0,
       expiresAt: now + ANON_RATE_LIMIT_WINDOW_MS,
-    })
-    return { allowed: true, retryAfter: 0 }
+    }
+    anonRateLimitBuckets.set(identifier, bucket)
   }
 
   if (bucket.count >= ANON_RATE_LIMIT_MAX_REQUESTS) {

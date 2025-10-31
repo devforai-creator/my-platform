@@ -63,6 +63,7 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 - `/api/chat` rate limiting:
   - Authenticated traffic runs through the `check_chat_rate_limit` RPC (service role only) backed by the `chat_rate_limits` ledger table.
   - Anonymous traffic is throttled by an in-memory IP bucket to dampen spray attacks before they hit Supabase.
+- Anonymous quota enforcement (v0.1.8): the edge handler now trusts Vercel-provided IP headers first, sanitises fallbacks, and caps/garbage-collects in-memory buckets to prevent spoofing and denial-of-service amplification.
 - Token usage telemetry persists into `chat_usage_events`, enabling future anomaly detection and billing dashboards.
 - Vault helper functions append audit rows to `vault_secret_audit` for every create/delete operation and for denied attempts, providing traceability for BYOK actions.
 
