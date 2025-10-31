@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- `/api/chat` now enforces a hard cap on incoming messages (≤20) and per-message payload size (≤2KB) before invoking external LLM providers, returning `400` for oversized requests.
+- Vault-related error logging in chat and API key server actions masks Supabase error objects, keeping only error codes out of server logs to reduce inadvertent secret leakage.
+
+### Tooling
+- Added the missing `dotenv` package to the workspace so type checking of the starter-character seed script succeeds during production builds.
+
 ## [0.1.6] - 2025-10-30
 
 ### Added

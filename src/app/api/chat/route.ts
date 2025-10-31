@@ -14,6 +14,9 @@ import type { Database } from '@/types/database.types'
 export const runtime = 'edge'
 export const maxDuration = 60 // 60초 타임아웃
 
+const MAX_MESSAGES_PER_REQUEST = 20
+const MAX_MESSAGE_BYTES = 2_048
+
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => null)
@@ -54,6 +57,20 @@ export async function POST(req: Request) {
 
     if (sanitizedMessages.length === 0) {
       return new Response('Messages array required', { status: 400 })
+    }
+
+    if (sanitizedMessages.length > MAX_MESSAGES_PER_REQUEST) {
+      return new Response('Too many messages in request', { status: 400 })
+    }
+
+    const textEncoder = new TextEncoder()
+    const oversizedMessage = sanitizedMessages.find((message) => {
+      const byteLength = textEncoder.encode(message.content).length
+      return byteLength > MAX_MESSAGE_BYTES
+    })
+
+    if (oversizedMessage) {
+      return new Response('Message exceeds allowed size', { status: 400 })
     }
 
     const lastMessage = sanitizedMessages[sanitizedMessages.length - 1]
@@ -99,7 +116,12 @@ export async function POST(req: Request) {
     )
 
     if (secretError || !secretData) {
-      console.error('Failed to decrypt API key:', secretError)
+      console.error('[Chat API] Failed to decrypt API key', {
+        code:
+          secretError && typeof secretError === 'object' && 'code' in secretError
+            ? (secretError as { code?: string | null }).code ?? null
+            : null,
+      })
       return new Response('Failed to decrypt API key', { status: 500 })
     }
 

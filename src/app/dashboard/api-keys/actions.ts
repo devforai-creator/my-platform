@@ -30,7 +30,12 @@ export async function createApiKey(formData: FormData) {
   })
 
   if (vaultError) {
-    console.error('Vault error:', vaultError)
+    console.error('[API Keys] create_secret failed', {
+      code:
+        vaultError && typeof vaultError === 'object' && 'code' in vaultError
+          ? (vaultError as { code?: string | null }).code ?? null
+          : null,
+    })
     return { error: 'API 키 암호화 저장 실패: ' + vaultError.message }
   }
 
@@ -92,7 +97,12 @@ export async function deleteApiKey(id: string) {
   })
 
   if (vaultError) {
-    console.error('Vault delete error:', vaultError)
+    console.error('[API Keys] delete_secret failed', {
+      code:
+        vaultError && typeof vaultError === 'object' && 'code' in vaultError
+          ? (vaultError as { code?: string | null }).code ?? null
+          : null,
+    })
   }
 
   revalidatePath('/dashboard/api-keys')
