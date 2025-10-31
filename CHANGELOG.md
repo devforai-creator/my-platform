@@ -7,8 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] - 2025-11-01
+
 ### Added
 - Self-service account deletion exposed via `/dashboard/account`, including a new settings view and client action flow.
+
+### Documentation
+- **Deployment Trust Boundaries**: Documented X-Forwarded-For header trust assumptions in SECURITY.md following Codex security review
+  - Clarified that Vercel deployments rely on trusted `X-Vercel-IP` header for anonymous rate limiting
+  - Added guidance for self-hosted/non-Vercel deployments on reverse proxy configuration
+  - Documented potential rate limiting bypass risks in local development and mitigation options
+- Updated Supported Versions table to include v0.1.10
 
 ### Security
 - Account removal now deletes any remaining BYOK Vault secrets before invoking `auth.admin.deleteUser`, guaranteeing `vault_secret_audit` emits matching `delete` entries.

@@ -46,7 +46,7 @@ When reviewing code or making changes, be aware that both agents may have contri
 
 ## Project Overview
 
-CharacterChat Platform - A BYOK (Bring Your Own Key) character chat platform built with Next.js 15, Supabase, and Vercel AI SDK. Users register their own API keys (Google, OpenAI, Anthropic) to chat with custom AI characters. Currently at Phase 0 (v0.1.9).
+CharacterChat Platform - A BYOK (Bring Your Own Key) character chat platform built with Next.js 15, Supabase, and Vercel AI SDK. Users register their own API keys (Google, OpenAI, Anthropic) to chat with custom AI characters. Currently at Phase 0 (v0.1.10).
 
 ## Development Commands
 
@@ -297,6 +297,15 @@ export default function MyComponent() {
 
 ## Recent Updates
 
+### v0.1.10 (2025-11-01) - Security Documentation
+
+📚 **Documentation Improvements**:
+- **Deployment Trust Boundaries**: Added comprehensive documentation of X-Forwarded-For header trust assumptions
+  - Clarified Vercel's `X-Vercel-IP` provides tamper-proof client identification
+  - Documented rate limiting bypass risks for non-Vercel deployments
+  - Added mitigation guidance for self-hosted environments
+- **Transparency**: No code changes, focus on operational security clarity following Codex review
+
 ### v0.1.5 (2025-10-30) - Critical Security + Onboarding
 
 🔒 **Critical Security Enhancement**:
@@ -326,7 +335,7 @@ export default function MyComponent() {
 ✅ **Token Statistics**: Real-time display in chat interface + dashboard statistics card
 ✅ **Cost Monitoring**: Users can now track token usage to manage API costs
 
-## Known Issues & Limitations (v0.1.5)
+## Known Issues & Limitations (v0.1.10)
 
 - **Fixed Context Window**: Currently hardcoded to 20 messages, no UI to customize
 - **No Chat Export**: Cannot export chat history yet

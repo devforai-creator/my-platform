@@ -25,6 +25,7 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 5. **HTTPS Only**: All communications are encrypted in transit
 6. **Vault Audit Trail** (v0.1.7+): Every BYOK secret create/delete (and denied attempt) is logged to `vault_secret_audit` for forensic review
 7. **Secret Naming & Quotas** (v0.1.7+): `create_secret` enforces the `apikey_<user>_<provider>_<timestamp>` pattern and caps users at 10 active keys
+8. **Server-Only Module Guards** (v0.1.9+): Supabase helpers import `server-only`, so any accidental client import triggers a build-time failure before privileged keys can leak.
 
 **Reference**:
 - Migration: `supabase/migrations/04_secure_get_decrypted_secret.sql`
@@ -67,10 +68,43 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 - Token usage telemetry persists into `chat_usage_events`, enabling future anomaly detection and billing dashboards.
 - Vault helper functions append audit rows to `vault_secret_audit` for every create/delete operation and for denied attempts, providing traceability for BYOK actions.
 
+### Deployment Trust Boundaries (v0.1.10+)
+
+**IP-Based Rate Limiting for Anonymous Requests**:
+
+The `/api/chat` endpoint relies on client IP addresses for anonymous rate limiting. The `extractClientIdentifier` function (`src/app/api/chat/route.ts:551-583`) prioritizes trusted proxy headers in this order:
+
+1. `X-Vercel-IP` (Vercel's trusted header, set by infrastructure)
+2. `X-Real-IP` (trusted reverse proxy header)
+3. `X-Vercel-IP` (Vercel-specific, tamper-proof)
+4. `CF-Connecting-IP` (Cloudflare-specific)
+5. `X-Forwarded-For` (leftmost public IP)
+6. Hashed User-Agent (fallback)
+
+**Security Considerations**:
+
+- **Vercel Deployment (Recommended)**: When deployed on Vercel, `X-Vercel-IP` is automatically set by Vercel's infrastructure and cannot be spoofed by clients. This header takes precedence over `X-Forwarded-For`, making rate limiting bypass attempts ineffective.
+
+- **Other Hosting Environments**: If deploying outside Vercel (e.g., self-hosted, other cloud providers), ensure your reverse proxy or CDN:
+  - Strips or overwrites client-provided `X-Forwarded-For` headers
+  - Sets a trusted header like `X-Real-IP` or equivalent
+  - Otherwise, malicious clients can spoof `X-Forwarded-For` to bypass anonymous rate limits
+
+- **Local Development**: Rate limiting in local environments may be bypassable via header manipulation. This is acceptable for development but should not be used in production without proper proxy configuration.
+
+**Mitigation Options for Non-Vercel Deployments**:
+
+1. **Option 1**: Configure your reverse proxy (nginx, HAProxy, etc.) to sanitize `X-Forwarded-For` and set trusted headers
+2. **Option 2**: Disable anonymous access entirely by requiring authentication for all `/api/chat` requests
+3. **Option 3**: Implement user-scoped rate limiting tokens instead of IP-based throttling
+
+**Reference**: This trust boundary was documented following Codex security review recommendations (2025-11-01).
+
 ## Supported Versions
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 0.1.10  | :white_check_mark: |
 | 0.1.9   | :white_check_mark: |
 | 0.1.8   | :x: (Anonymous rate-limit collisions on shared edge IPs) |
 | 0.1.7   | :x: (Service-role key exposure on Edge runtime) |
@@ -78,7 +112,7 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 | 0.1.4   | :x: (Critical vulnerability) |
 | < 0.1.4 | :x:                |
 
-**Please upgrade to v0.1.9 for the latest security improvements.**
+**Please upgrade to v0.1.10 for the latest security improvements.**
 
 ## Security Incidents
 
@@ -373,4 +407,4 @@ We believe in transparent security practices:
 
 ---
 
-**Last Updated**: 2025-10-31 (v0.1.9)
+**Last Updated**: 2025-11-01 (v0.1.10)
