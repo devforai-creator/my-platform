@@ -123,12 +123,29 @@ interface MessageInsertRow {
   error_code?: string | null
 }
 
+interface ChatUsageEventInsertRow {
+  user_id: string
+  chat_id: string
+  api_key_id: string
+  model_provider: string
+  model_name: string | null
+  prompt_tokens: number | null
+  completion_tokens: number | null
+  total_tokens: number | null
+  request_id: string
+}
+
 interface SupabaseFixture {
   user: { id: string }
   apiKeys: ApiKeyRow[]
   chats: ChatRow[]
   characters: CharacterRow[]
   decryptedSecret?: string
+  rateLimit?: {
+    allowed: boolean
+    retryAfter?: number
+    error?: { message: string; code?: string | null }
+  }
 }
 
 class SupabaseRouteMock {
@@ -164,24 +181,65 @@ class SupabaseRouteMock {
 class SupabaseAdminMock {
   constructor(private readonly fixture: SupabaseFixture) {}
 
+  readonly usageEvents: ChatUsageEventInsertRow[] = []
+
   rpc(name: string, params: Record<string, unknown>) {
-    if (name !== 'get_decrypted_secret') {
-      throw new Error(`Unsupported admin RPC: ${name}`)
+    switch (name) {
+      case 'get_decrypted_secret': {
+        const requester = params.requester
+        if (requester !== this.fixture.user.id) {
+          return Promise.resolve({
+            data: null,
+            error: { message: 'Not authorized' },
+          })
+        }
+
+        const secret =
+          this.fixture.decryptedSecret ??
+          `decrypted-${String(params.secret_name ?? '')}`
+
+        return Promise.resolve({ data: secret, error: null })
+      }
+      case 'check_chat_rate_limit': {
+        if (this.fixture.rateLimit?.error) {
+          return Promise.resolve({
+            data: null,
+            error: this.fixture.rateLimit.error,
+          })
+        }
+
+        const allowed = this.fixture.rateLimit?.allowed ?? true
+        const retryAfter = this.fixture.rateLimit?.retryAfter ?? 0
+        const remaining = allowed ? 1 : 0
+
+        return Promise.resolve({
+          data: [
+            {
+              allowed,
+              remaining,
+              retry_after: retryAfter,
+            },
+          ],
+          error: null,
+        })
+      }
+      default:
+        throw new Error(`Unsupported admin RPC: ${name}`)
+    }
+  }
+
+  from(table: string) {
+    if (table !== 'chat_usage_events') {
+      throw new Error(`Unsupported admin table: ${table}`)
     }
 
-    const requester = params.requester
-    if (requester !== this.fixture.user.id) {
-      return Promise.resolve({
-        data: null,
-        error: { message: 'Not authorized' },
-      })
+    return {
+      insert: async (rows: ChatUsageEventInsertRow | ChatUsageEventInsertRow[]) => {
+        const payload = Array.isArray(rows) ? rows : [rows]
+        this.usageEvents.push(...payload)
+        return { data: payload, error: null }
+      },
     }
-
-    const secret =
-      this.fixture.decryptedSecret ??
-      `decrypted-${String(params.secret_name ?? '')}`
-
-    return Promise.resolve({ data: secret, error: null })
   }
 }
 
@@ -300,12 +358,19 @@ class MessagesTable {
   }
 }
 
-function createSupabaseMock(fixture: SupabaseFixture) {
+function createSupabaseMock(
+  fixture: SupabaseFixture
+): SupabaseRouteMock & { adminUsageEvents: ChatUsageEventInsertRow[] } {
   const routeMock = new SupabaseRouteMock(fixture)
   const adminMock = new SupabaseAdminMock(fixture)
   createClientMock.mockReturnValue(routeMock)
   createAdminClientMock.mockReturnValue(adminMock)
-  return routeMock
+  ;(routeMock as SupabaseRouteMock & {
+    adminUsageEvents: ChatUsageEventInsertRow[]
+  }).adminUsageEvents = adminMock.usageEvents
+  return routeMock as SupabaseRouteMock & {
+    adminUsageEvents: ChatUsageEventInsertRow[]
+  }
 }
 
 describe('POST /api/chat', () => {
@@ -460,6 +525,115 @@ describe('POST /api/chat', () => {
         chatId: 'chat-1',
       })
     )
+
+    expect(supabase.adminUsageEvents).toHaveLength(1)
+    expect(supabase.adminUsageEvents[0]).toMatchObject({
+      user_id: 'user-1',
+      chat_id: 'chat-1',
+      api_key_id: 'api-key-1',
+      model_provider: 'google',
+      model_name: 'gemini-2.5-flash',
+      prompt_tokens: 11,
+      completion_tokens: 22,
+      total_tokens: 33,
+    })
+  })
+
+  it('returns 429 when user rate limit is exceeded', async () => {
+    createSupabaseMock({
+      user: { id: 'user-1' },
+      apiKeys: [
+        {
+          id: 'api-key-1',
+          user_id: 'user-1',
+          provider: 'google',
+          is_active: true,
+          vault_secret_name: 'secret-key',
+          model_preference: 'gemini-2.5-flash',
+        },
+      ],
+      chats: [
+        {
+          id: 'chat-1',
+          user_id: 'user-1',
+          character_id: 'character-1',
+          max_context_messages: 20,
+        },
+      ],
+      characters: [
+        {
+          id: 'character-1',
+          system_prompt: 'character system prompt',
+        },
+      ],
+      rateLimit: {
+        allowed: false,
+        retryAfter: 12,
+      },
+    })
+
+    const request = new Request('http://localhost/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        chatId: 'chat-1',
+        apiKeyId: 'api-key-1',
+        messages: [{ role: 'user', content: 'rate limit me' }],
+      }),
+    })
+
+    const response = await POST(request)
+    expect(response.status).toBe(429)
+    const payload = await response.json()
+    expect(payload).toMatchObject({
+      error: 'Rate limit exceeded',
+      retryAfter: 12,
+    })
+  })
+
+  it('fails with 500 when rate limiter RPC errors', async () => {
+    createSupabaseMock({
+      user: { id: 'user-1' },
+      apiKeys: [
+        {
+          id: 'api-key-1',
+          user_id: 'user-1',
+          provider: 'google',
+          is_active: true,
+          vault_secret_name: 'secret-key',
+          model_preference: 'gemini-2.5-flash',
+        },
+      ],
+      chats: [
+        {
+          id: 'chat-1',
+          user_id: 'user-1',
+          character_id: 'character-1',
+          max_context_messages: 20,
+        },
+      ],
+      characters: [
+        {
+          id: 'character-1',
+          system_prompt: 'character system prompt',
+        },
+      ],
+      rateLimit: {
+        allowed: true,
+        error: { message: 'db down', code: 'XX001' },
+      },
+    })
+
+    const request = new Request('http://localhost/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        chatId: 'chat-1',
+        apiKeyId: 'api-key-1',
+        messages: [{ role: 'user', content: 'hello' }],
+      }),
+    })
+
+    const response = await POST(request)
+    expect(response.status).toBe(500)
   })
 
   it('returns a descriptive error when the provider blocks the response', async () => {

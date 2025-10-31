@@ -5,14 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.7] - 2025-10-31
 
 ### Security
 - `/api/chat` now enforces a hard cap on incoming messages (≤20) and per-message payload size (≤2KB) before invoking external LLM providers, returning `400` for oversized requests.
 - Vault-related error logging in chat and API key server actions masks Supabase error objects, keeping only error codes out of server logs to reduce inadvertent secret leakage.
+- Added first-pass abuse protection for `/api/chat`: authenticated calls are throttled via the `check_chat_rate_limit` service RPC (default 30 req/min per user), and unauthenticated requests fall back to in-memory IP throttling to deter spray attacks.
+- Supabase Vault helpers now validate secret naming, enforce per-user BYOK quotas, and emit audit rows (`vault_secret_audit`) for every create/delete or denied attempt.
 
 ### Tooling
 - Added the missing `dotenv` package to the workspace so type checking of the starter-character seed script succeeds during production builds.
+- New telemetry ledger (`chat_usage_events`) records per-request token usage, enabling future dashboards and billing alerts.
 
 ## [0.1.6] - 2025-10-30
 

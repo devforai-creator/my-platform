@@ -232,11 +232,120 @@ export interface Database {
           created_at?: string
         }
       }
+      chat_usage_events: {
+        Row: {
+          id: string
+          user_id: string
+          chat_id: string
+          api_key_id: string | null
+          model_provider: string
+          model_name: string | null
+          prompt_tokens: number | null
+          completion_tokens: number | null
+          total_tokens: number | null
+          request_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          chat_id: string
+          api_key_id?: string | null
+          model_provider: string
+          model_name?: string | null
+          prompt_tokens?: number | null
+          completion_tokens?: number | null
+          total_tokens?: number | null
+          request_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          chat_id?: string
+          api_key_id?: string | null
+          model_provider?: string
+          model_name?: string | null
+          prompt_tokens?: number | null
+          completion_tokens?: number | null
+          total_tokens?: number | null
+          request_id?: string
+          created_at?: string
+        }
+      }
+      chat_rate_limits: {
+        Row: {
+          user_id: string
+          window_start: string
+          request_count: number
+        }
+        Insert: {
+          user_id: string
+          window_start: string
+          request_count?: number
+        }
+        Update: {
+          user_id?: string
+          window_start?: string
+          request_count?: number
+        }
+      }
+      vault_secret_audit: {
+        Row: {
+          id: string
+          user_id: string | null
+          secret_name: string
+          action: 'create' | 'delete' | 'attempt_denied'
+          details: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          secret_name: string
+          action: 'create' | 'delete' | 'attempt_denied'
+          details?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          secret_name?: string
+          action?: 'create' | 'delete' | 'attempt_denied'
+          details?: string | null
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      check_chat_rate_limit: {
+        Args: {
+          target_user_id: string
+          window_seconds: number
+          max_requests: number
+        }
+        Returns: Array<{
+          allowed: boolean | null
+          remaining: number | null
+          retry_after: number | null
+        }>
+      }
+      create_secret: {
+        Args: {
+          secret_name: string
+          secret_value: string
+        }
+        Returns: string
+      }
+      delete_secret: {
+        Args: {
+          secret_name: string
+        }
+        Returns: undefined
+      }
       get_decrypted_secret: {
         Args: {
           secret_name: string
@@ -275,6 +384,10 @@ export type MessageUpdate = Database['public']['Tables']['messages']['Update']
 export type ChatSummary = Database['public']['Tables']['chat_summaries']['Row']
 export type ChatSummaryInsert = Database['public']['Tables']['chat_summaries']['Insert']
 export type ChatSummaryUpdate = Database['public']['Tables']['chat_summaries']['Update']
+
+export type ChatUsageEvent = Database['public']['Tables']['chat_usage_events']['Row']
+export type ChatUsageEventInsert = Database['public']['Tables']['chat_usage_events']['Insert']
+export type ChatUsageEventUpdate = Database['public']['Tables']['chat_usage_events']['Update']
 
 // Extended types with relations
 export type CharacterWithOwner = Character & {

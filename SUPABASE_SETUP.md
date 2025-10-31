@@ -33,6 +33,7 @@ Phase 0 MVP를 위한 Supabase 데이터베이스 설정 가이드입니다.
 3. SQL Editor에 붙여넣기
 4. 우측 하단 **"Run"** 버튼 클릭 (또는 Cmd/Ctrl + Enter)
 5. 성공 메시지 확인: "Success. No rows returned"
+6. 이후 `01_vault_helpers.sql` → `02_update_vault_delete_secret.sql` → `03_chat_summaries.sql` → `04_secure_get_decrypted_secret.sql` → `05_allow_starter_characters.sql` → `06_rate_limit_and_vault_audit.sql` 순서로 반복 실행하여 최신 보안/기능 스키마를 모두 적용합니다. (v0.1.7 이상에서는 06번 파일이 필수입니다.)
 
 ### 2-3. 테이블 생성 확인
 1. 왼쪽 메뉴에서 **"Table Editor"** 클릭
@@ -69,16 +70,40 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...
 
 ---
 
-## 4. 인증 설정 (선택)
+## 4. 인증 설정
 
-### 4-1. 이메일 인증 활성화
+### 4-1. URL Configuration (필수) ⚠️
+
+**프로덕션 배포 시 반드시 설정해야 합니다!**
+
+1. **"Authentication"** > **"URL Configuration"** 메뉴
+2. 다음 설정 입력:
+
+**Site URL**:
+```
+https://mycharacterchatplatform.vercel.app
+```
+> 배포된 도메인으로 변경하세요. 이메일 인증 링크가 이 URL을 기반으로 생성됩니다.
+
+**Redirect URLs** (한 줄에 하나씩):
+```
+https://mycharacterchatplatform.vercel.app/**
+http://localhost:3000/**
+```
+> `/**`는 모든 하위 경로를 허용합니다. localhost는 로컬 개발용입니다.
+
+3. **"Save"** 버튼 클릭
+
+⚠️ **주의**: 이 설정을 하지 않으면 이메일 인증 링크가 `localhost`로 생성되어 배포된 사이트에서 회원가입이 불가능합니다!
+
+### 4-2. 이메일 인증 활성화
 1. **"Authentication"** > **"Providers"** 메뉴
 2. **"Email"** 활성화 확인 (기본 활성화됨)
 3. 설정:
    - **Confirm email**: ON (이메일 인증 필수)
    - **Secure email change**: ON (이메일 변경 시 확인)
 
-### 4-2. 소셜 로그인 추가 (선택)
+### 4-3. 소셜 로그인 추가 (선택)
 나중에 Google, GitHub 등 추가 가능
 
 ---

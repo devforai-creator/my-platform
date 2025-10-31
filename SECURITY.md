@@ -23,6 +23,8 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 3. **Row Level Security (RLS)**: Database policies ensure users can only access their own data
 4. **Edge Runtime Proxy**: API keys are never exposed to the browser
 5. **HTTPS Only**: All communications are encrypted in transit
+6. **Vault Audit Trail** (v0.1.7+): Every BYOK secret create/delete (and denied attempt) is logged to `vault_secret_audit` for forensic review
+7. **Secret Naming & Quotas** (v0.1.7+): `create_secret` enforces the `apikey_<user>_<provider>_<timestamp>` pattern and caps users at 10 active keys
 
 **Reference**:
 - Migration: `supabase/migrations/04_secure_get_decrypted_secret.sql`
@@ -56,16 +58,24 @@ This platform uses a **Bring Your Own Key (BYOK)** model where users register th
 - Migration: `supabase/migrations/05_allow_starter_characters.sql`
 - Seed Script: `seed-starter-character.ts` (admin only)
 
+### Abuse Mitigation & Telemetry (v0.1.7+)
+
+- `/api/chat` rate limiting:
+  - Authenticated traffic runs through the `check_chat_rate_limit` RPC (service role only) backed by the `chat_rate_limits` ledger table.
+  - Anonymous traffic is throttled by an in-memory IP bucket to dampen spray attacks before they hit Supabase.
+- Token usage telemetry persists into `chat_usage_events`, enabling future anomaly detection and billing dashboards.
+- Vault helper functions append audit rows to `vault_secret_audit` for every create/delete operation and for denied attempts, providing traceability for BYOK actions.
+
 ## Supported Versions
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 0.1.7   | :white_check_mark: |
 | 0.1.6   | :white_check_mark: |
-| 0.1.5   | :white_check_mark: |
 | 0.1.4   | :x: (Critical vulnerability) |
 | < 0.1.4 | :x:                |
 
-**Please upgrade to v0.1.6 for the latest features and security improvements.**
+**Please upgrade to v0.1.7 for the latest features and security improvements.**
 
 ## Security Incidents
 
@@ -290,4 +300,4 @@ We believe in transparent security practices:
 
 ---
 
-**Last Updated**: 2025-10-30 (v0.1.6)
+**Last Updated**: 2025-10-31 (v0.1.7)

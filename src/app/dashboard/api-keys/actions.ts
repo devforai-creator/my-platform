@@ -36,6 +36,22 @@ export async function createApiKey(formData: FormData) {
           ? (vaultError as { code?: string | null }).code ?? null
           : null,
     })
+
+    const normalizedMessage = vaultError.message?.toLowerCase() ?? ''
+
+    if (normalizedMessage.includes('quota exceeded')) {
+      return {
+        error:
+          'API 키 등록 한도를 초과했습니다. 사용하지 않는 키를 삭제하거나 비활성화 후 다시 시도해주세요.',
+      }
+    }
+
+    if (normalizedMessage.includes('invalid secret name')) {
+      return {
+        error: 'API 키 이름 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+      }
+    }
+
     return { error: 'API 키 암호화 저장 실패: ' + vaultError.message }
   }
 
@@ -103,6 +119,12 @@ export async function deleteApiKey(id: string) {
           ? (vaultError as { code?: string | null }).code ?? null
           : null,
     })
+
+    if (vaultError.message?.toLowerCase().includes('secret not found')) {
+      return {
+        error: 'Vault에서 해당 시크릿을 찾을 수 없습니다. 이미 삭제된 키일 수 있습니다.',
+      }
+    }
   }
 
   revalidatePath('/dashboard/api-keys')

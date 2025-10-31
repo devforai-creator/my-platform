@@ -16,6 +16,14 @@ export const maxDuration = 60 // 60초 타임아웃
 
 const MAX_MESSAGES_PER_REQUEST = 20
 const MAX_MESSAGE_BYTES = 2_048
+const USER_RATE_LIMIT_WINDOW_SECONDS = 60
+const USER_RATE_LIMIT_MAX_REQUESTS = 30
+const ANON_RATE_LIMIT_WINDOW_MS = 60_000
+const ANON_RATE_LIMIT_MAX_REQUESTS = 10
+
+type AnonBucket = { count: number; expiresAt: number }
+
+const anonRateLimitBuckets = new Map<string, AnonBucket>()
 
 export async function POST(req: Request) {
   try {
@@ -81,6 +89,7 @@ export async function POST(req: Request) {
 
     const supabase = await createClient()
     const adminSupabase = createAdminClient()
+    const requestId = crypto.randomUUID()
 
     // 사용자 인증 확인
     const {
@@ -88,7 +97,72 @@ export async function POST(req: Request) {
     } = await supabase.auth.getUser()
 
     if (!user) {
+      const clientIdentifier = extractClientIdentifier(req)
+      const anonLimit = applyAnonRateLimit(clientIdentifier)
+
+      if (!anonLimit.allowed) {
+        return new Response(
+          JSON.stringify({
+            error: 'Too many requests',
+            retryAfter: anonLimit.retryAfter,
+          }),
+          {
+            status: 429,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        )
+      }
+
       return new Response('Unauthorized', { status: 401 })
+    }
+
+    const rateLimitArgs = {
+      target_user_id: user.id,
+      window_seconds: USER_RATE_LIMIT_WINDOW_SECONDS,
+      max_requests: USER_RATE_LIMIT_MAX_REQUESTS,
+    } satisfies Database['public']['Functions']['check_chat_rate_limit']['Args']
+
+    const rateLimitResult = await adminSupabase.rpc(
+      'check_chat_rate_limit',
+      rateLimitArgs as never
+    )
+
+    if (rateLimitResult.error) {
+      console.error('[Chat API] Rate limit RPC failed', {
+        code: rateLimitResult.error.code ?? null,
+      })
+      return new Response('Internal server error', { status: 500 })
+    }
+
+    type RateLimitRow = {
+      allowed: boolean | null
+      remaining: number | null
+      retry_after: number | null
+    }
+
+    const rateLimiterPayload: RateLimitRow | null = Array.isArray(rateLimitResult.data)
+      ? ((rateLimitResult.data[0] as RateLimitRow | undefined) ?? null)
+      : null
+
+    if (!rateLimiterPayload || rateLimiterPayload.allowed === false) {
+      const retryAfter =
+        typeof rateLimiterPayload?.retry_after === 'number'
+          ? Math.max(1, rateLimiterPayload.retry_after)
+          : USER_RATE_LIMIT_WINDOW_SECONDS
+
+      return new Response(
+        JSON.stringify({
+          error: 'Rate limit exceeded',
+          retryAfter,
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(retryAfter),
+          },
+        }
+      )
     }
 
     // API 키 정보 가져오기
@@ -303,6 +377,27 @@ export async function POST(req: Request) {
             .eq('id', apiKeyId)
 
           await updateSummaries({ supabase, chatId, model })
+
+          const totalTokens = usage?.totalTokens ?? null
+          const promptTokens = usage?.promptTokens ?? null
+          const completionTokens = usage?.completionTokens ?? null
+
+          const usageEvent: Database['public']['Tables']['chat_usage_events']['Insert'] = {
+            user_id: user.id,
+            chat_id: chatId,
+            api_key_id: apiKeyId,
+            model_provider: provider,
+            model_name: modelName,
+            prompt_tokens: promptTokens,
+            completion_tokens: completionTokens,
+            total_tokens: totalTokens,
+            request_id: requestId,
+          }
+
+          // Cast required due to Supabase insert typing bug with satisfied literals.
+          await adminSupabase
+            .from('chat_usage_events')
+            .insert(usageEvent as never)
         } catch (error) {
           console.error('Error saving messages:', error)
         }
@@ -417,4 +512,48 @@ function buildContentFilterMessage(provider: string, categories: string[]): stri
     .join(', ')
 
   return `${baseMessage}\n감지된 카테고리: ${formattedCategories}`
+}
+
+function extractClientIdentifier(req: Request): string {
+  const forwarded = req.headers.get('x-forwarded-for')
+  if (forwarded) {
+    const candidate = forwarded.split(',')[0]?.trim()
+    if (candidate) {
+      return candidate
+    }
+  }
+
+  const cfIp = req.headers.get('cf-connecting-ip')
+  if (cfIp) {
+    return cfIp
+  }
+
+  return 'unknown'
+}
+
+function applyAnonRateLimit(identifier: string): {
+  allowed: boolean
+  retryAfter: number
+} {
+  const now = Date.now()
+  const bucket = anonRateLimitBuckets.get(identifier)
+
+  if (!bucket || bucket.expiresAt <= now) {
+    anonRateLimitBuckets.set(identifier, {
+      count: 1,
+      expiresAt: now + ANON_RATE_LIMIT_WINDOW_MS,
+    })
+    return { allowed: true, retryAfter: 0 }
+  }
+
+  if (bucket.count >= ANON_RATE_LIMIT_MAX_REQUESTS) {
+    const retryAfter = Math.ceil((bucket.expiresAt - now) / 1000)
+    return {
+      allowed: false,
+      retryAfter: Math.max(retryAfter, 1),
+    }
+  }
+
+  bucket.count += 1
+  return { allowed: true, retryAfter: 0 }
 }
