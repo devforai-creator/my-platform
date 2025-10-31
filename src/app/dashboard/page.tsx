@@ -173,6 +173,25 @@ export default async function DashboardPage() {
               캐릭터와 대화를 시작하세요
             </p>
           </Link>
+
+          <Link
+            href="/dashboard/account"
+            className="block p-6 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              계정 설정
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              계정 삭제 등 민감한 작업을 관리하세요
+            </p>
+          </Link>
         </div>
 
         {/* 시작 가이드 */}
