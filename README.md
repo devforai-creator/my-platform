@@ -1,5 +1,28 @@
 # CharacterChat Platform
 
+**Status: Development Paused** ⏸️
+
+## Notice (2025-11-01)
+
+This repository contains the last public release (v0.1.10).
+
+Future development will be private while I focus on:
+- Character Card Import
+- Security improvements
+- Core feature completion
+
+**This code remains open-source** under MIT License.
+You can:
+- ✅ Fork and use
+- ✅ Self-host
+- ✅ Modify freely
+
+**Official instance:** Closed for new signups
+
+---
+
+Last updated: 2025-11-01
+
 **Phase 0 (v0.1.9)** - BYOK(Bring Your Own Key) 기반 캐릭터 채팅 플랫폼
 
 [![Deploy Status](https://img.shields.io/badge/deploy-success-brightgreen)](https://mycharacterchatplatform.vercel.app)
