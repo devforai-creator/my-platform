@@ -49,7 +49,7 @@ export default function SignupPage() {
           </p>
           <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-2">
             오픈소스 코드는 <a
-              href="https://github.com/tmdduq96kr/my-platform"
+              href="https://github.com/devforai-creator/my-platform"
               target="_blank"
               rel="noopener noreferrer"
               className="underline hover:text-yellow-900 dark:hover:text-yellow-100"
