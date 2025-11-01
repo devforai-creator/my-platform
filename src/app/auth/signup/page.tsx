@@ -6,10 +6,8 @@ import { signup } from '../actions'
 
 export default function SignupPage() {
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
 
   async function handleSubmit(formData: FormData) {
-    setLoading(true)
     setError(null)
 
     const password = formData.get('password') as string
@@ -17,7 +15,6 @@ export default function SignupPage() {
 
     if (password !== confirmPassword) {
       setError('비밀번호가 일치하지 않습니다')
-      setLoading(false)
       return
     }
 
@@ -25,7 +22,6 @@ export default function SignupPage() {
 
     if (result?.error) {
       setError(result.error)
-      setLoading(false)
     }
     // 성공 시 redirect가 자동으로 처리됨
   }
@@ -39,6 +35,27 @@ export default function SignupPage() {
           </h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             무료로 시작하세요
+          </p>
+        </div>
+
+        {/* 신규 가입 중단 안내 */}
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 px-4 py-4 rounded-lg">
+          <h3 className="text-sm font-semibold text-yellow-800 dark:text-yellow-400 mb-2">
+            신규 가입이 일시 중단되었습니다
+          </h3>
+          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+            현재 보안 강화 및 개선 작업을 위해 신규 가입을 받지 않고 있습니다.
+            기존 사용자는 계속 이용 가능합니다.
+          </p>
+          <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-2">
+            오픈소스 코드는 <a
+              href="https://github.com/tmdduq96kr/my-platform"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-yellow-900 dark:hover:text-yellow-100"
+            >
+              GitHub
+            </a>에서 확인하실 수 있습니다.
           </p>
         </div>
 
@@ -119,10 +136,10 @@ export default function SignupPage() {
           <div>
             <button
               type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              disabled={true}
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gray-400 cursor-not-allowed transition-colors"
             >
-              {loading ? '가입 중...' : '회원가입'}
+              회원가입 중단됨
             </button>
           </div>
 
